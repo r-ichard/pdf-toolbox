@@ -88,13 +88,57 @@ The built files will be in the `dist` directory.
 - Safari 14+
 - Edge 90+
 
+## Testing
+
+The project includes comprehensive testing with unit tests, integration tests, and end-to-end tests.
+
+### Quick Commands
+```bash
+# Run all tests
+npm run test:all
+
+# Run with detailed reporting
+npm run test:all:detailed
+
+# Run with coverage
+npm run test:all:with-coverage
+
+# Run individual test suites
+npm run test:unit          # Unit tests only
+npm run test:e2e           # E2E tests only
+npm run lint               # Code quality checks
+```
+
+### Comprehensive Test Runner
+For detailed test execution with progress reporting:
+```bash
+# Cross-platform Node.js runner
+node scripts/test-all.js
+
+# With verbose output for debugging
+node scripts/test-all.js --verbose
+
+# With coverage report
+node scripts/test-all.js --coverage
+```
+
+The test runner executes these phases:
+1. **Code Quality** - ESLint checks
+2. **TypeScript** - Type checking  
+3. **Unit Tests** - Component and utility tests
+4. **Build** - Production build verification
+5. **E2E Tests** - Full workflow testing with Playwright
+
+See `scripts/README.md` for detailed testing documentation.
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. **Run tests**: `npm run test:all`
+5. Add tests if applicable
+6. Submit a pull request
 
 ## Project Structure
 

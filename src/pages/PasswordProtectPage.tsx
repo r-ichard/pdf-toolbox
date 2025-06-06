@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import FileDropZone from '../components/FileDropZone';
 import ProgressBar from '../components/ProgressBar';
-import { generatePDFPreview } from '../utils/pdfUtils';
-import { addPasswordToPDF } from '../utils/pdfUtils';
+import { generatePDFPreview, addPasswordToPDF } from '../utils/pdfUtils';
 
 export default function PasswordProtectPage() {
   const [file, setFile] = useState<File | null>(null);

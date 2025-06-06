@@ -4,9 +4,9 @@ test.describe('Accessibility Features', () => {
   test('should have proper heading hierarchy', async ({ page }) => {
     await page.goto('/');
     
-    // Check for h1
-    const h1 = page.getByRole('heading', { level: 1 });
-    await expect(h1).toBeVisible();
+    // Check for the main h1 heading on homepage
+    const mainHeading = page.getByRole('heading', { name: 'Free Online PDF Tools - Edit, Convert & Manage PDFs' });
+    await expect(mainHeading).toBeVisible();
     
     // Verify heading structure (should have logical hierarchy)
     const headings = await page.locator('h1, h2, h3, h4, h5, h6').all();
@@ -37,7 +37,7 @@ test.describe('Accessibility Features', () => {
     await page.goto('/');
     
     // Check that text is visible (basic contrast check)
-    await expect(page.getByRole('heading', { name: 'PDF Toolbox' })).toBeVisible();
+    await expect(page.getByText('PDF Toolbox')).toBeVisible();
     
     // Check that buttons have proper styling
     const toolLinks = page.getByRole('link');
@@ -60,8 +60,8 @@ test.describe('Accessibility Features', () => {
   test('should handle focus management', async ({ page }) => {
     await page.goto('/');
     
-    // Navigate to a tool page
-    await page.getByRole('link', { name: /merge pdfs/i }).click();
+    // Navigate to a tool page using the specific CTA button
+    await page.getByRole('link', { name: 'Merge PDFs Now →' }).click();
     
     // Check that focus is properly managed after navigation
     await expect(page.getByRole('heading', { name: 'Merge PDFs' })).toBeVisible();
@@ -72,7 +72,7 @@ test.describe('Accessibility Features', () => {
     await page.goto('/');
     
     // Check that content is still visible
-    await expect(page.getByRole('heading', { name: 'PDF Toolbox' })).toBeVisible();
+    await expect(page.getByText('PDF Toolbox')).toBeVisible();
   });
 
   test('should have proper form labels', async ({ page }) => {

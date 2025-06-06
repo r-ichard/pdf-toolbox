@@ -17,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex justify-between items-center py-4">
             <Link to="/" className="flex items-center space-x-2">
               <FileText className="w-8 h-8 text-primary-600" />
-              <h1 className="text-2xl font-bold text-gray-900">PDF Toolbox</h1>
+              <span className="text-2xl font-bold text-gray-900">PDF Toolbox</span>
             </Link>
             
             {!isHome && (

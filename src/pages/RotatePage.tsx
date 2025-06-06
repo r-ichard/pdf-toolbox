@@ -327,7 +327,7 @@ export default function RotatePage() {
                 <LoadingSpinner message="Loading page previews..." />
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
                 {pageRotations.map((page) => (
                   <div
                     key={page.pageNumber}
@@ -340,7 +340,7 @@ export default function RotatePage() {
                     `}
                   >
                     <div 
-                      className="aspect-[3/4] bg-gray-100 rounded mb-2 flex items-center justify-center cursor-pointer"
+                      className="aspect-[3/4] bg-gray-100 rounded mb-2 flex items-center justify-center cursor-pointer min-h-[200px]"
                       onClick={() => togglePageSelection(page.pageNumber)}
                     >
                       {page.preview ? (

@@ -1,48 +1,75 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mergePDFs, getPageCount, generatePDFPreview, rotatePDF } from '../pdfUtils'
 
-// Mock pdf-lib
-vi.mock('pdf-lib', () => ({
-  PDFDocument: {
-    create: vi.fn().mockResolvedValue({
-      addPage: vi.fn(),
-      copyPages: vi.fn().mockResolvedValue([{}]),
-      setTitle: vi.fn(),
-      setAuthor: vi.fn(),
-      setSubject: vi.fn(),
-      setCreator: vi.fn(),
-      save: vi.fn().mockResolvedValue(new Uint8Array(1000)),
-    }),
-    load: vi.fn().mockResolvedValue({
-      getPageCount: vi.fn().mockReturnValue(3),
-      getPageIndices: vi.fn().mockReturnValue([0, 1, 2]),
-      getPages: vi.fn().mockReturnValue([
-        { setRotation: vi.fn() },
-        { setRotation: vi.fn() },
-        { setRotation: vi.fn() },
-      ]),
-    }),
-  },
-  degrees: vi.fn((angle) => angle),
-  rgb: vi.fn((r, g, b) => ({ r, g, b })),
-  StandardFonts: {
-    Helvetica: 'Helvetica'
+// Mock DOM globals
+Object.defineProperty(global, 'document', {
+  value: {
+    createElement: vi.fn().mockReturnValue({
+      getContext: vi.fn().mockReturnValue({}),
+      toDataURL: vi.fn().mockReturnValue('data:image/png;base64,mock'),
+      width: 0,
+      height: 0,
+    })
   }
-}))
+})
+
+// Mock fetch for worker initialization
+global.fetch = vi.fn().mockResolvedValue({
+  ok: true,
+  status: 200,
+})
+
+// Mock pdf-lib
+vi.mock('pdf-lib', () => {
+  const mockPDFDoc = {
+    addPage: vi.fn(),
+    copyPages: vi.fn().mockResolvedValue([{}]),
+    setTitle: vi.fn(),
+    setAuthor: vi.fn(),
+    setSubject: vi.fn(),
+    setCreator: vi.fn(),
+    save: vi.fn().mockResolvedValue(new Uint8Array(1000)),
+    getPageCount: vi.fn().mockReturnValue(3),
+    getPageIndices: vi.fn().mockReturnValue([0, 1, 2]),
+    getPages: vi.fn().mockReturnValue([
+      { setRotation: vi.fn() },
+      { setRotation: vi.fn() },
+      { setRotation: vi.fn() },
+    ]),
+  }
+
+  return {
+    PDFDocument: {
+      create: vi.fn().mockResolvedValue(mockPDFDoc),
+      load: vi.fn().mockResolvedValue(mockPDFDoc),
+    },
+    degrees: vi.fn((angle) => angle),
+    rgb: vi.fn((r, g, b) => ({ r, g, b })),
+    StandardFonts: {
+      Helvetica: 'Helvetica'
+    }
+  }
+})
 
 // Mock pdfjs-dist
-vi.mock('pdfjs-dist', () => ({
-  GlobalWorkerOptions: { workerSrc: '' },
-  getDocument: vi.fn().mockReturnValue({
-    promise: Promise.resolve({
-      getPage: vi.fn().mockResolvedValue({
-        getViewport: vi.fn().mockReturnValue({ width: 595, height: 842 }),
-        render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
-      }),
+vi.mock('pdfjs-dist', () => {
+  const mockPDF = {
+    numPages: 3,
+    getPage: vi.fn().mockResolvedValue({
+      getViewport: vi.fn().mockReturnValue({ width: 595, height: 842 }),
+      render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
     }),
-  }),
-  version: '3.0.0'
-}))
+    destroy: vi.fn(),
+  }
+
+  return {
+    GlobalWorkerOptions: { workerSrc: '' },
+    getDocument: vi.fn().mockReturnValue({
+      promise: Promise.resolve(mockPDF)
+    }),
+    version: '3.0.0'
+  }
+})
 
 // Mock file-saver
 vi.mock('file-saver', () => ({
@@ -113,17 +140,18 @@ describe('pdfUtils', () => {
     it('should generate preview for valid PDF', async () => {
       const mockFile = new File(['pdf'], 'test.pdf', { type: 'application/pdf' })
       
-      // Mock canvas
+      // Update the canvas mock for this specific test
       const mockCanvas = {
-        toDataURL: vi.fn().mockReturnValue('data:image/png;base64,mock'),
+        toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,mock'),
         getContext: vi.fn().mockReturnValue({}),
         width: 0,
         height: 0,
       }
-      global.document.createElement = vi.fn().mockReturnValue(mockCanvas)
+      
+      vi.mocked(global.document.createElement).mockReturnValueOnce(mockCanvas as any)
       
       const preview = await generatePDFPreview(mockFile)
-      expect(preview).toBe('data:image/png;base64,mock')
+      expect(preview).toBe('data:image/jpeg;base64,mock')
     })
 
     it('should return empty string on error', async () => {
@@ -135,8 +163,13 @@ describe('pdfUtils', () => {
         promise: Promise.reject(new Error('Invalid PDF'))
       } as any)
       
+      // Suppress error logging for this test
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      
       const preview = await generatePDFPreview(mockFile)
       expect(preview).toBe('')
+      
+      consoleSpy.mockRestore()
     })
   })
 
@@ -180,7 +213,12 @@ describe('Edge Cases and Error Handling', () => {
     const { PDFDocument } = await import('pdf-lib')
     vi.mocked(PDFDocument.load).mockRejectedValueOnce(new Error('Corrupted PDF'))
     
+    // Suppress error logging for this test
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    
     await expect(getPageCount(corruptFile)).resolves.toBe(0)
+    
+    consoleSpy.mockRestore()
   })
 
   it('should handle extremely large files', async () => {

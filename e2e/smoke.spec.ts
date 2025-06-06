@@ -4,9 +4,9 @@ test.describe('Smoke Tests - Core Functionality', () => {
   test('application loads successfully', async ({ page }) => {
     await page.goto('/');
     
-    // Basic page load check
-    await expect(page.getByText('PDF Toolbox')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Free PDF Tools')).toBeVisible();
+    // Basic page load check - use more specific selectors
+    await expect(page.getByRole('heading', { name: 'Free Online PDF Tools - Edit, Convert & Manage PDFs' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Professional PDF editor and converter tools')).toBeVisible();
   });
 
   test('can navigate to all tool pages', async ({ page }) => {
@@ -25,7 +25,8 @@ test.describe('Smoke Tests - Core Functionality', () => {
 
     for (const tool of tools) {
       await page.goto(tool.path);
-      await expect(page.locator('h1')).toContainText(tool.heading, { timeout: 5000 });
+      // Use more specific selector to avoid multiple h1 elements
+      await expect(page.getByRole('heading', { name: tool.heading, level: 1 })).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -57,18 +58,25 @@ test.describe('Smoke Tests - Core Functionality', () => {
   });
 
   test('local-first architecture', async ({ page }) => {
-    // Load page first
+    // Load page first and wait for it to be fully loaded
     await page.goto('/');
-    await expect(page.getByText('PDF Toolbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Free Online PDF Tools - Edit, Convert & Manage PDFs' })).toBeVisible();
+    
+    // Load merge page to cache it
+    await page.goto('/merge');
+    await expect(page.getByRole('heading', { name: 'Merge PDFs', level: 1 })).toBeVisible();
+    
+    // Now go back to home and test offline navigation within the cached app
+    await page.goto('/');
     
     // Simulate offline
     await page.context().setOffline(true);
     
-    // Should still be able to navigate (since it's local-first)
-    await page.goto('/merge');
+    // Test client-side navigation (should work since it's a SPA)
+    await page.click('a[href="/merge"]');
     
-    // The app should work offline since it's local-first
-    await expect(page.locator('h1')).toContainText('Merge', { timeout: 5000 });
+    // The app should work offline since it's local-first SPA
+    await expect(page.getByRole('heading', { name: 'Merge PDFs', level: 1 })).toBeVisible({ timeout: 5000 });
     
     await page.context().setOffline(false);
   });

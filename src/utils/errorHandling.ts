@@ -87,8 +87,8 @@ export function classifyError(error: any): ProcessingError {
   }
 
   let code = ErrorCodes.UNKNOWN_ERROR;
-  let recoverable = true;
-  let userMessage = '';
+  const recoverable = true;
+  const userMessage = '';
 
   // Classify based on error message or type
   const message = error.message?.toLowerCase() || '';

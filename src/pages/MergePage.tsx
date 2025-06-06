@@ -212,7 +212,7 @@ export default function MergePage() {
             files={files}
             onRemove={handleRemoveFile}
             onReorder={handleReorderFiles}
-            showReorder={true}
+            showReorder
           />
 
           {files.length > 0 && (

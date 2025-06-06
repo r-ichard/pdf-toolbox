@@ -57,7 +57,7 @@ export async function convertImagesToPDF(files: File[], options: ImageToPdfOptio
     let y = 0;
     
     switch (fitMode) {
-      case 'fit':
+      case 'fit': {
         const scaleX = pageSize.width / imgWidth;
         const scaleY = pageSize.height / imgHeight;
         const scale = Math.min(scaleX, scaleY);
@@ -66,8 +66,9 @@ export async function convertImagesToPDF(files: File[], options: ImageToPdfOptio
         x = (pageSize.width - drawWidth) / 2;
         y = (pageSize.height - drawHeight) / 2;
         break;
+      }
         
-      case 'fill':
+      case 'fill': {
         const scaleXFill = pageSize.width / imgWidth;
         const scaleYFill = pageSize.height / imgHeight;
         const scaleFill = Math.max(scaleXFill, scaleYFill);
@@ -76,6 +77,7 @@ export async function convertImagesToPDF(files: File[], options: ImageToPdfOptio
         x = (pageSize.width - drawWidth) / 2;
         y = (pageSize.height - drawHeight) / 2;
         break;
+      }
         
       case 'center':
         x = (pageSize.width - imgWidth) / 2;

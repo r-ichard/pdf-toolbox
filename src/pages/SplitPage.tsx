@@ -65,7 +65,7 @@ export default function SplitPage() {
       
       // Generate thumbnails for all pages with progress tracking
       const thumbnails = await generatePageThumbnailsBatch(file, pageNumbers, {
-        scale: 0.6,
+        scale: 1.5,
         quality: 0.8,
         batchSize: 3,
         onProgress: (_completed, _total) => {
@@ -308,7 +308,7 @@ export default function SplitPage() {
                   <LoadingSpinner message="Loading page previews..." />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4" data-testid="page-grid">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8" data-testid="page-grid">
                   {pageSelections.map((page) => (
                     <div
                       key={page.pageNumber}
@@ -322,7 +322,7 @@ export default function SplitPage() {
                       `}
                       onClick={() => togglePageSelection(page.pageNumber)}
                     >
-                      <div className="aspect-[3/4] bg-gray-100 rounded mb-2">
+                      <div className="aspect-[3/4] bg-gray-100 rounded mb-2 min-h-[200px]">
                         <LazyThumbnail
                           src={page.preview}
                           alt={`Page ${page.pageNumber}`}

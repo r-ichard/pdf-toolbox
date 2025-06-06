@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import FileDropZone from '../components/FileDropZone';
 import ProgressBar from '../components/ProgressBar';
-import { generatePDFPreview } from '../utils/pdfUtils';
-import { removePasswordFromPDF } from '../utils/pdfUtils';
+import { generatePDFPreview, removePasswordFromPDF } from '../utils/pdfUtils';
 
 export default function PasswordRemovePage() {
   const [file, setFile] = useState<File | null>(null);

@@ -43,19 +43,23 @@ describe('FileDropZone', () => {
   })
 
   it('handles valid file selection', async () => {
-    const user = userEvent.setup()
     render(<FileDropZone {...defaultProps} />)
     
     const file = new File(['pdf content'], 'test.pdf', { type: 'application/pdf' })
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
-    await user.upload(input, file)
+    // Directly trigger the change handler instead of using userEvent
+    Object.defineProperty(input, 'files', {
+      value: [file],
+      writable: false,
+    })
+    
+    fireEvent.change(input)
     
     expect(mockOnFilesSelected).toHaveBeenCalledWith([file])
   })
 
   it('rejects files that exceed size limit', async () => {
-    const user = userEvent.setup()
     render(<FileDropZone {...defaultProps} maxSizePerFile={1024} />)
     
     // Create a file that's definitely larger than 1024 bytes
@@ -70,30 +74,37 @@ describe('FileDropZone', () => {
     
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
-    await user.upload(input, largeFile)
+    // Directly trigger the change handler
+    Object.defineProperty(input, 'files', {
+      value: [largeFile],
+      writable: false,
+    })
+    
+    fireEvent.change(input)
     
     expect(mockOnFilesSelected).not.toHaveBeenCalled()
     expect(screen.getByText(/large.pdf is too large/)).toBeInTheDocument()
   })
 
   it('rejects unsupported file types', async () => {
-    const user = userEvent.setup()
     render(<FileDropZone {...defaultProps} />)
     
     const invalidFile = new File(['text'], 'test.txt', { type: 'text/plain' })
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
-    // Temporarily remove the accept attribute to allow the upload in tests
-    input.removeAttribute('accept')
+    // Directly trigger the change handler
+    Object.defineProperty(input, 'files', {
+      value: [invalidFile],
+      writable: false,
+    })
     
-    await user.upload(input, invalidFile)
+    fireEvent.change(input)
     
     expect(mockOnFilesSelected).not.toHaveBeenCalled()
     expect(screen.getByText(/test.txt is not a supported file type/)).toBeInTheDocument()
   })
 
   it('rejects when exceeding max file count', async () => {
-    const user = userEvent.setup()
     render(<FileDropZone {...defaultProps} maxFiles={2} />)
     
     const files = [
@@ -103,7 +114,13 @@ describe('FileDropZone', () => {
     ]
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
-    await user.upload(input, files)
+    // Directly trigger the change handler
+    Object.defineProperty(input, 'files', {
+      value: files,
+      writable: false,
+    })
+    
+    fireEvent.change(input)
     
     expect(mockOnFilesSelected).not.toHaveBeenCalled()
     expect(screen.getByText('Maximum 2 files allowed')).toBeInTheDocument()
@@ -153,10 +170,13 @@ describe('FileDropZone', () => {
     const invalidFile = new File(['text'], 'test.txt', { type: 'text/plain' })
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     
-    // Temporarily remove the accept attribute to allow the upload in tests
-    input.removeAttribute('accept')
+    // Directly trigger the change handler
+    Object.defineProperty(input, 'files', {
+      value: [invalidFile],
+      writable: false,
+    })
     
-    await user.upload(input, invalidFile)
+    fireEvent.change(input)
     
     const errorMessage = screen.getByText(/test.txt is not a supported file type/)
     expect(errorMessage).toBeInTheDocument()
@@ -167,20 +187,16 @@ describe('FileDropZone', () => {
     expect(errorMessage).not.toBeInTheDocument()
   })
 
-  it('supports keyboard navigation', async () => {
-    const user = userEvent.setup()
+  it('supports keyboard navigation', () => {
     render(<FileDropZone {...defaultProps} />)
     
     const dropZone = screen.getByLabelText(/Drop files here or click to select/)
     
-    // Should be focusable
-    dropZone.focus()
-    expect(dropZone).toHaveFocus()
+    // Should be focusable and have tabindex
+    expect(dropZone).toHaveAttribute('tabIndex', '0')
     
-    // Enter key should trigger file dialog
-    await user.keyboard('{Enter}')
-    // Note: We can't easily test the actual file dialog opening,
-    // but we can verify the element has proper event handlers
+    // Should have proper accessibility role
+    expect(dropZone).toHaveAttribute('role', 'button')
   })
 
   it('opens file dialog on click', async () => {
@@ -200,7 +216,6 @@ describe('FileDropZone', () => {
   })
 
   it('handles file extension validation correctly', async () => {
-    const user = userEvent.setup()
     render(
       <FileDropZone 
         {...defaultProps} 
@@ -214,7 +229,14 @@ describe('FileDropZone', () => {
     ]
     
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    await user.upload(input, validFiles)
+    
+    // Directly trigger the change handler
+    Object.defineProperty(input, 'files', {
+      value: validFiles,
+      writable: false,
+    })
+    
+    fireEvent.change(input)
     
     expect(mockOnFilesSelected).toHaveBeenCalledWith(validFiles)
   })

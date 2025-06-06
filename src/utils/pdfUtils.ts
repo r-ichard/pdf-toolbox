@@ -428,7 +428,7 @@ export async function generatePDFPreview(file: File, pageNumber: number = 1, ret
     
     const page = await pdf.getPage(pageNumber);
     
-    const scale = 0.5;
+    const scale = 1.2;
     const viewport = page.getViewport({ scale });
     
     const canvas = document.createElement('canvas');
@@ -480,7 +480,7 @@ export async function generateAllPagePreviews(
     onProgress?: (progress: number, message: string) => void;
   } = {}
 ): Promise<PagePreview[]> {
-  const { scale = 0.8, maxPages = 50, quality = 0.85, onProgress } = options;
+  const { scale = 1.2, maxPages = 50, quality = 0.85, onProgress } = options;
   
   try {
     onProgress?.(10, 'Loading PDF...');
@@ -544,7 +544,7 @@ export async function generatePagePreview(
   pageNumber: number,
   options: { scale?: number; format?: 'png' | 'jpeg'; quality?: number; retryCount?: number } = {}
 ): Promise<string> {
-  const { scale = 0.5, format = 'png', quality = 1.0, retryCount = 0 } = options;
+  const { scale = 1.2, format = 'png', quality = 1.0, retryCount = 0 } = options;
   const maxRetries = 2;
   
   try {
@@ -751,7 +751,7 @@ export async function generatePageThumbnailWithCache(
   pageNumber: number,
   options: { scale?: number; quality?: number; useCache?: boolean } = {}
 ): Promise<string> {
-  const { scale = 0.8, quality = 0.85, useCache = true } = options;
+  const { scale = 1.2, quality = 0.85, useCache = true } = options;
   
   const cacheKey = getThumbnailCacheKey(file.name, pageNumber, scale);
   
@@ -792,7 +792,7 @@ export async function generatePageThumbnailsBatch(
   } = {}
 ): Promise<Map<number, string>> {
   const { 
-    scale = 0.8, 
+    scale = 1.2, 
     quality = 0.85, 
     useCache = true, 
     onProgress,

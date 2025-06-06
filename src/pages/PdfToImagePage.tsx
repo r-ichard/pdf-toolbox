@@ -293,7 +293,7 @@ export default function PdfToImagePage() {
                     <LoadingSpinner message="Loading page previews..." />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
                     {pageSelections.map((page) => (
                       <div
                         key={page.pageNumber}
@@ -306,7 +306,7 @@ export default function PdfToImagePage() {
                         `}
                         onClick={() => togglePageSelection(page.pageNumber)}
                       >
-                        <div className="aspect-[3/4] bg-gray-100 rounded mb-2 flex items-center justify-center">
+                        <div className="aspect-[3/4] bg-gray-100 rounded mb-2 flex items-center justify-center min-h-[200px]">
                           {page.preview ? (
                             <img
                               src={page.preview}
