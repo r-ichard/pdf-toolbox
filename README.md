@@ -160,6 +160,205 @@ src/
 └── App.tsx
 ```
 
+## Deployment
+
+This application supports multiple deployment methods for different environments and requirements.
+
+### Cloud Platforms (Recommended)
+
+#### Netlify (Static Hosting)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy)
+
+1. **Automatic Deployment**:
+   - Connect your GitHub repository to Netlify
+   - Build settings are pre-configured in `netlify.toml`
+   - Automatic deployments on every push to main branch
+
+2. **Manual Deployment**:
+   ```bash
+   npm run build
+   # Upload dist/ folder to Netlify
+   ```
+
+#### Vercel (Static Hosting)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+
+1. **Automatic Deployment**:
+   - Import your repository in Vercel dashboard
+   - Configuration automatically detected via `vercel.json`
+   - Zero-config deployment with preview environments
+
+2. **CLI Deployment**:
+   ```bash
+   npm i -g vercel
+   vercel --prod
+   ```
+
+### Self-Hosted Deployment
+
+#### Docker (Production Ready)
+
+**Quick Start:**
+```bash
+# Build and run
+docker build -t pdf-toolbox .
+docker run -p 3000:80 pdf-toolbox
+```
+
+**Docker Compose (with health checks):**
+```bash
+docker-compose up -d
+```
+
+**Features:**
+- Multi-stage build for optimal image size
+- Nginx with security headers
+- Health check endpoint at `/health`
+- Static asset caching
+- SPA routing support
+
+#### Manual Server Deployment
+
+**Build for production:**
+```bash
+npm install
+npm run build
+```
+
+**Nginx Configuration:**
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /path/to/dist;
+    index index.html;
+
+    # Security headers
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options DENY;
+    add_header X-XSS-Protection "1; mode=block";
+
+    # Cache static assets
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # SPA routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**Apache Configuration (.htaccess):**
+```apache
+RewriteEngine On
+RewriteBase /
+
+# Handle client-side routing
+RewriteRule ^index\.html$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+
+# Security headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+
+# Cache static assets
+<filesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
+    ExpiresActive On
+    ExpiresDefault "access plus 1 year"
+</filesMatch>
+```
+
+### Environment-Specific Configurations
+
+#### Development
+```bash
+npm run dev
+# Runs on http://localhost:5173
+```
+
+#### Staging/Preview
+```bash
+npm run build
+npm run preview
+# Runs on http://localhost:4173
+```
+
+#### Production Requirements
+
+**System Requirements:**
+- Node.js 18+ (for building)
+- Modern web server (Nginx, Apache, or CDN)
+- HTTPS certificate (recommended)
+
+**Performance Optimizations:**
+- Static asset compression (gzip/brotli)
+- CDN integration
+- HTTP/2 support
+- Browser caching headers
+
+**Security Considerations:**
+- Content Security Policy (CSP)
+- HTTPS enforcement
+- Security headers (included in configs)
+- Regular dependency updates
+
+### CI/CD Pipeline
+
+**GitHub Actions Example:**
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:ci
+      - run: npm run build
+      - name: Deploy to production
+        # Add your deployment steps here
+```
+
+### Monitoring & Health Checks
+
+**Health Check Endpoints:**
+- Docker: `http://localhost:3000/health`
+- Manual: Configure your web server
+
+**Monitoring Recommendations:**
+- Uptime monitoring
+- Performance metrics
+- Error tracking
+- User analytics (optional, privacy-respecting)
+
+### Troubleshooting
+
+**Common Issues:**
+- **SPA Routing**: Ensure your server serves `index.html` for unknown routes
+- **CORS Issues**: Not applicable (client-side only application)
+- **Build Failures**: Check Node.js version compatibility
+- **Memory Issues**: Increase Node.js heap size: `NODE_OPTIONS="--max-old-space-size=4096"`
+
+**Performance Issues:**
+- Enable compression (gzip/brotli)
+- Implement proper caching headers
+- Use a CDN for static assets
+- Monitor bundle size with `npm run build`
+
 ## License
 
 MIT License - see LICENSE file for details.
