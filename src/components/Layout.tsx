@@ -49,6 +49,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
             
             <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <a href="https://github.com/r-ichard/pdf-toolbox?tab=readme-ov-file" target="_blank" rel="noreferrer">Github</a>
               <PrivacyIcon className="w-4 h-4" />
               <span>No files uploaded • No data stored • 100% private</span>
             </div>
