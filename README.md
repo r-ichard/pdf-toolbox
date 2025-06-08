@@ -1,35 +1,40 @@
 # PDF Toolbox Web
 
-A modern, privacy-focused PDF toolbox that runs entirely in your browser. No uploads, no accounts, complete privacy.
+A comprehensive, privacy-focused PDF toolbox with 10+ powerful tools that runs entirely in your browser. Merge, split, compress, rotate, organize, watermark, and protect PDFs with no uploads, no accounts, and complete privacy.
 
 ## Features
 
-### ✅ Implemented
-- **PDF Merge**: Combine multiple PDF files into one document
-- **Responsive Design**: Works on desktop and mobile devices
-- **Local Processing**: All PDF operations happen in your browser
-- **Drag & Drop**: Intuitive file handling
-- **Progress Tracking**: Real-time feedback during processing
-- **Error Handling**: Graceful error handling with helpful messages
-
-### 🔄 Coming Soon
-- PDF Split: Divide PDFs into separate pages or sections
-- PDF Compression: Reduce file size while maintaining quality
-- PDF to Images: Convert PDF pages to JPG/PNG
-- Images to PDF: Create PDFs from image files
-- PDF Rotation: Rotate pages in your PDF
-- Page Organizer: Reorder, duplicate, or delete pages
-- Watermarking: Add text or image watermarks
-- Password Protection: Add/remove password protection
+### ✅ Fully Implemented
+- **PDF Merge**: Combine multiple PDF files into one document with metadata support
+- **PDF Split**: Extract specific pages or split every N pages with visual page selection
+- **PDF Compression**: Reduce file size with multiple quality levels (low, medium, high)
+- **PDF to Images**: Convert PDF pages to JPG/PNG with custom resolution and quality settings
+- **Images to PDF**: Create PDFs from multiple image files with page size and fit options
+- **PDF Rotation**: Rotate individual pages by 90°, 180°, or 270° with visual preview
+- **Page Organizer**: Reorder, duplicate, or delete pages with drag-and-drop interface
+- **Watermarking**: Add text or image watermarks with position and opacity controls
+- **Password Protection**: Add password protection with granular permissions control
+- **Password Removal**: Remove existing password protection from encrypted PDFs
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Local Processing**: All PDF operations happen entirely in your browser - no server uploads
+- **Drag & Drop**: Intuitive file handling with visual feedback
+- **Progress Tracking**: Real-time progress indicators for all operations
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **File Validation**: Robust validation for file types, sizes, and content
+- **Live Previews**: Page thumbnails and previews for all operations
 
 ## Technology Stack
 
 - **React 18** with TypeScript for the UI
-- **PDF-lib** for PDF manipulation
-- **PDF.js** for PDF rendering and preview
-- **Tailwind CSS** for styling
-- **Vite** for build tooling
+- **React Router** for client-side routing
+- **PDF-lib** for PDF manipulation and creation
+- **PDF.js** for PDF rendering, preview generation, and page thumbnails
+- **Tailwind CSS** for responsive styling
+- **Vite** for fast development and optimized builds
+- **Vitest** for unit testing
+- **Playwright** for end-to-end testing
 - **JSZip** for creating downloadable archives
+- **File-saver** for file downloads
 
 ## Getting Started
 
@@ -69,10 +74,73 @@ The built files will be in the `dist` directory.
 
 ### PDF Merge
 1. Navigate to the Merge PDFs tool
-2. Drag and drop PDF files or click to select
+2. Drag and drop PDF files or click to select (up to 10 files, 100MB each)
 3. Reorder files by dragging them in the preview
 4. Optionally add metadata (title, author, subject)
 5. Click "Merge & Download" to generate your merged PDF
+
+### PDF Split
+1. Select the Split PDF tool
+2. Upload a single PDF file
+3. Choose split method: extract specific pages or split every N pages
+4. For specific pages: select individual pages from the visual grid
+5. Click "Split & Download" to get a ZIP file with separate PDFs
+
+### PDF Compression
+1. Go to the Compress PDF tool
+2. Upload your PDF file
+3. Choose compression level (Low, Medium, or High)
+4. Preview estimated file size reduction
+5. Click "Compress & Download" for the optimized PDF
+
+### PDF to Images
+1. Use the PDF to Images tool
+2. Upload a PDF file
+3. Select format (JPG/PNG), resolution (72/150/300 DPI), and quality
+4. Choose to convert all pages or select specific pages
+5. Download as ZIP file containing all images
+
+### Images to PDF
+1. Access the Images to PDF tool
+2. Upload multiple image files (JPG, PNG, BMP, TIFF)
+3. Drag to reorder images, set page size and fit mode
+4. Choose quality settings
+5. Create and download your PDF
+
+### PDF Rotation
+1. Open the Rotate PDF tool
+2. Upload a PDF file
+3. Select pages and apply rotations (90°, 180°, 270°)
+4. Use quick actions for bulk operations
+5. Apply rotations and download the result
+
+### Page Organization
+1. Use the Organize Pages tool
+2. Upload a PDF file
+3. Drag pages to reorder, use duplicate/delete buttons
+4. Preview the new document structure
+5. Apply changes and download organized PDF
+
+### Watermarking
+1. Navigate to Add Watermark tool
+2. Upload a PDF file
+3. Choose text or image watermark
+4. Customize position, opacity, and appearance
+5. Select pages to apply watermark
+6. Download watermarked PDF
+
+### Password Protection
+1. Go to Password Protect PDF tool
+2. Upload a PDF file
+3. Set user password (for opening) and/or owner password (for permissions)
+4. Configure document permissions (printing, copying, etc.)
+5. Download protected PDF
+
+### Password Removal
+1. Use Remove Password Protection tool
+2. Upload an encrypted PDF file
+3. Enter the current password
+4. Download unlocked PDF
 
 ## Privacy & Security
 
@@ -145,19 +213,39 @@ See `scripts/README.md` for detailed testing documentation.
 ```
 src/
 ├── components/          # Reusable UI components
+│   ├── ErrorBoundary.tsx
 │   ├── FileDropZone.tsx
 │   ├── FilePreview.tsx
+│   ├── Icons.tsx
+│   ├── Layout.tsx
+│   ├── LazyThumbnail.tsx
+│   ├── LoadingSpinner.tsx
 │   ├── ProgressBar.tsx
-│   └── ...
-├── pages/              # Page components
+│   └── __tests__/      # Component tests
+├── pages/              # Page components for each PDF tool
 │   ├── HomePage.tsx
 │   ├── MergePage.tsx
-│   └── ...
+│   ├── SplitPage.tsx
+│   ├── CompressPage.tsx
+│   ├── PdfToImagePage.tsx
+│   ├── ImageToPdfPage.tsx
+│   ├── RotatePage.tsx
+│   ├── OrganizePage.tsx
+│   ├── WatermarkPage.tsx
+│   ├── PasswordProtectPage.tsx
+│   └── PasswordRemovePage.tsx
 ├── utils/              # Utility functions
-│   ├── pdfUtils.ts
-│   └── imageUtils.ts
+│   ├── pdfUtils.ts     # PDF manipulation utilities
+│   ├── imageUtils.ts   # Image processing utilities
+│   ├── validation.ts   # File validation
+│   ├── errorHandling.ts # Error handling
+│   └── __tests__/      # Utility tests
 ├── types/              # TypeScript type definitions
-└── App.tsx
+│   └── index.ts
+├── hooks/              # Custom React hooks
+├── test/               # Test setup and configuration
+├── App.tsx             # Main application component
+└── main.tsx           # Application entry point
 ```
 
 ## Deployment
