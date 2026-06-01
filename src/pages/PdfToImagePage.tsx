@@ -3,6 +3,7 @@ import { PDFFile, ProcessingProgress, ImageFormat, Resolution } from '@/types';
 import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorBanner from '@/components/ErrorBanner';
 import { Download, Check, FileText, Image } from '@/components/Icons';
 import { convertPdfToImages, downloadImageZip } from '@/utils/imageUtils';
 import { getPageCount, generatePDFPreview } from '@/utils/pdfUtils';
@@ -35,6 +36,7 @@ export default function PdfToImagePage() {
   const [progress, setProgress] = useState<ProcessingProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelected = useCallback(async (files: File[]) => {
     const selectedFile = files[0];
@@ -115,7 +117,8 @@ export default function PdfToImagePage() {
     
     setIsProcessing(true);
     setIsComplete(false);
-    
+    setError(null);
+
     try {
       const images = await convertPdfToImages(file.file, {
         format: selectedFormat.id,
@@ -124,15 +127,13 @@ export default function PdfToImagePage() {
         pages: selectedPages,
         onProgress: (current, message) => setProgress({ current, total: 100, message })
       });
-      
-      if (images.length > 0) {
-        const zipName = `${file.name.replace('.pdf', '')}_images.zip`;
-        await downloadImageZip(images, zipName);
-        setIsComplete(true);
-      }
-    } catch (error) {
-      console.error('Conversion failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during conversion' });
+
+      const zipName = `${file.name.replace(/\.pdf$/i, '')}_images.zip`;
+      await downloadImageZip(images, zipName);
+      setIsComplete(true);
+    } catch (err) {
+      console.error('Conversion failed:', err);
+      setError('We couldn\'t convert this PDF to images. It may be corrupted or password-protected — try removing the password first.');
     } finally {
       setIsProcessing(false);
     }
@@ -171,6 +172,7 @@ export default function PdfToImagePage() {
         </FileDropZone>
       ) : (
         <div className="space-y-6">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
           {/* File Info */}
           <div className="card">
             <div className="flex items-center space-x-4">

@@ -4,6 +4,7 @@ import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import LazyThumbnail from '@/components/LazyThumbnail';
+import ErrorBanner from '@/components/ErrorBanner';
 import { Download, Check, FileText } from '@/components/Icons';
 import { splitPDF, downloadZip, getPageCount, generatePDFPreview, generatePageThumbnailsBatch } from '@/utils/pdfUtils';
 
@@ -24,6 +25,7 @@ export default function SplitPage() {
   const [progress, setProgress] = useState<ProcessingProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelected = useCallback(async (files: File[]) => {
     const selectedFile = files[0];
@@ -115,6 +117,7 @@ export default function SplitPage() {
 
     setIsProcessing(true);
     setIsComplete(false);
+    setError(null);
 
     try {
       let splitOptions;
@@ -167,9 +170,9 @@ export default function SplitPage() {
         await downloadZip(splitResults, zipName);
         setIsComplete(true);
       }
-    } catch (error) {
-      console.error('Split failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during split' });
+    } catch (err) {
+      console.error('Split failed:', err);
+      setError('We couldn\'t split this PDF. It may be corrupted or password-protected — try removing the password first.');
     } finally {
       setIsProcessing(false);
     }
@@ -211,6 +214,7 @@ export default function SplitPage() {
         </FileDropZone>
       ) : (
         <div className="space-y-6">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
           {/* File Info */}
           <div className="card">
             <div className="flex items-center space-x-4">

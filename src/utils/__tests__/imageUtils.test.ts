@@ -30,9 +30,11 @@ vi.mock('pdfjs-dist', () => ({
         getViewport: vi.fn().mockReturnValue({ width: 595, height: 842 }),
         render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
       }),
+      destroy: vi.fn(),
     }),
   }),
-  version: '3.0.0'
+  GlobalWorkerOptions: { workerSrc: '' },
+  version: '4.10.38'
 }))
 
 // Mock file-saver and jszip
@@ -56,6 +58,8 @@ describe('imageUtils', () => {
     // Mock canvas and context
     const mockContext = {
       drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
     }
     
     const mockCanvas = {

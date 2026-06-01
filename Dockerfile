@@ -3,7 +3,9 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+# Build needs devDependencies (tsc, vite, tailwind). The final nginx stage copies
+# only /app/dist, so none of these node_modules end up in the shipped image.
+RUN npm ci
 
 COPY . .
 RUN npm run build
@@ -25,8 +27,9 @@ server {
     # Security headers
     add_header X-Content-Type-Options nosniff;
     add_header X-Frame-Options DENY;
-    add_header X-XSS-Protection "1; mode=block";
     add_header Referrer-Policy strict-origin-when-cross-origin;
+    # No external origin anywhere — documents never leave the browser.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
 
     # Cache static assets
     location /assets/ {

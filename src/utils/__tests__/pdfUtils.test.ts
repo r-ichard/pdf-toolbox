@@ -32,9 +32,9 @@ vi.mock('pdf-lib', () => {
     getPageCount: vi.fn().mockReturnValue(3),
     getPageIndices: vi.fn().mockReturnValue([0, 1, 2]),
     getPages: vi.fn().mockReturnValue([
-      { setRotation: vi.fn() },
-      { setRotation: vi.fn() },
-      { setRotation: vi.fn() },
+      { setRotation: vi.fn(), getRotation: vi.fn(() => ({ angle: 0 })) },
+      { setRotation: vi.fn(), getRotation: vi.fn(() => ({ angle: 0 })) },
+      { setRotation: vi.fn(), getRotation: vi.fn(() => ({ angle: 0 })) },
     ]),
   }
 

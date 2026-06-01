@@ -3,6 +3,7 @@ import { ProcessingProgress, PageSize } from '@/types';
 import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorBanner from '@/components/ErrorBanner';
 import { Download, Check, Image as ImageIcon, X } from '@/components/Icons';
 import { convertImagesToPDF } from '@/utils/imageUtils';
 import { downloadFile } from '@/utils/pdfUtils';
@@ -47,6 +48,7 @@ export default function ImageToPdfPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<ProcessingProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const createImagePreview = (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -94,9 +96,10 @@ export default function ImageToPdfPage() {
     
     setIsProcessing(true);
     setIsComplete(false);
-    
+    setError(null);
+
     try {
-      const currentPageSize = pageSize.id === 'custom' 
+      const currentPageSize = pageSize.id === 'custom'
         ? { width: customWidth, height: customHeight }
         : pageSize;
 
@@ -113,19 +116,19 @@ export default function ImageToPdfPage() {
       const fileName = `images_to_pdf_${Date.now()}.pdf`;
       downloadFile(pdfBytes, fileName);
       setIsComplete(true);
-    } catch (error) {
-      console.error('Conversion failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during conversion' });
+    } catch (err) {
+      console.error('Conversion failed:', err);
+      setError(err instanceof Error ? err.message : 'We couldn\'t create a PDF from these images. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes <= 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
@@ -140,9 +143,11 @@ export default function ImageToPdfPage() {
         </p>
       </div>
 
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
+
       <FileDropZone
         onFilesSelected={handleFilesSelected}
-        acceptedTypes={['.jpg', '.jpeg', '.png', '.bmp', '.tiff', 'image/jpeg', 'image/png', 'image/bmp', 'image/tiff']}
+        acceptedTypes={['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp', 'image/jpeg', 'image/png', 'image/bmp', 'image/gif', 'image/webp']}
         maxFiles={50}
         maxSizePerFile={50 * 1024 * 1024}
         className={images.length > 0 ? 'border-dashed border-2 border-gray-300 rounded-lg p-4' : ''}
@@ -154,7 +159,7 @@ export default function ImageToPdfPage() {
               {images.length > 0 ? 'Add more images' : 'Select image files'}
             </p>
             <p className="text-sm text-gray-600 mt-1">
-              JPG, PNG, BMP, TIFF (up to 50 files, 50MB each)
+              JPG, PNG, BMP, GIF, WEBP (up to 50 files, 50MB each)
             </p>
           </div>
         </div>

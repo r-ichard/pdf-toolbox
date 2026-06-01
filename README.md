@@ -7,14 +7,14 @@ A comprehensive, privacy-focused PDF toolbox with 10+ powerful tools that runs e
 ### ✅ Fully Implemented
 - **PDF Merge**: Combine multiple PDF files into one document with metadata support
 - **PDF Split**: Extract specific pages or split every N pages with visual page selection
-- **PDF Compression**: Reduce file size with multiple quality levels (low, medium, high)
+- **PDF Compression**: Lossless structure optimization plus optional image re-encoding for scans. Never produces a file larger than the original, and reports the real before/after size.
 - **PDF to Images**: Convert PDF pages to JPG/PNG with custom resolution and quality settings
-- **Images to PDF**: Create PDFs from multiple image files with page size and fit options
-- **PDF Rotation**: Rotate individual pages by 90°, 180°, or 270° with visual preview
+- **Images to PDF**: Create PDFs from multiple image files (JPG, PNG, BMP, GIF, WEBP) with page size and fit options
+- **PDF Rotation**: Rotate individual pages by 90°, 180°, or 270° with visual preview (rotation is additive over any existing page rotation)
 - **Page Organizer**: Reorder, duplicate, or delete pages with drag-and-drop interface
-- **Watermarking**: Add text or image watermarks with position and opacity controls
-- **Password Protection**: Add password protection with granular permissions control
-- **Password Removal**: Remove existing password protection from encrypted PDFs
+- **Watermarking**: Add text (any hex color) or PNG/JPEG image watermarks with position and opacity controls
+- **Password Protection**: Real 256-bit AES encryption with granular permissions, performed entirely in your browser via qpdf-wasm
+- **Password Removal**: Decrypt password-protected PDFs in-browser (with a clear "incorrect password" message on failure)
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Local Processing**: All PDF operations happen entirely in your browser - no server uploads
 - **Drag & Drop**: Intuitive file handling with visual feedback
@@ -28,7 +28,8 @@ A comprehensive, privacy-focused PDF toolbox with 10+ powerful tools that runs e
 - **React 18** with TypeScript for the UI
 - **React Router** for client-side routing
 - **PDF-lib** for PDF manipulation and creation
-- **PDF.js** for PDF rendering, preview generation, and page thumbnails
+- **PDF.js** for PDF rendering, preview generation, and page thumbnails (worker bundled & served same-origin — no CDN)
+- **qpdf-wasm** for real, in-browser PDF encryption/decryption (lazy-loaded)
 - **Tailwind CSS** for responsive styling
 - **Vite** for fast development and optimized builds
 - **Vitest** for unit testing
@@ -102,7 +103,7 @@ The built files will be in the `dist` directory.
 
 ### Images to PDF
 1. Access the Images to PDF tool
-2. Upload multiple image files (JPG, PNG, BMP, TIFF)
+2. Upload multiple image files (JPG, PNG, BMP, GIF, WEBP)
 3. Drag to reorder images, set page size and fit mode
 4. Choose quality settings
 5. Create and download your PDF
@@ -144,10 +145,12 @@ The built files will be in the `dist` directory.
 
 ## Privacy & Security
 
-- **100% Client-Side**: All processing happens in your browser
+- **100% Client-Side**: All processing happens in your browser — including encryption (qpdf-wasm) and the PDF.js worker, both served from the app's own origin
 - **No Uploads**: Files never leave your device
+- **No External Requests**: A strict Content-Security-Policy (`connect-src 'self'`) is shipped on every deploy target, so the app cannot reach any third-party origin
 - **No Tracking**: No analytics or data collection
 - **No Accounts**: Use anonymously without registration
+- **Works Offline**: No CDN dependencies; once loaded, every tool runs without a network connection
 
 ## Browser Compatibility
 

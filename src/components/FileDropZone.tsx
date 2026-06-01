@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { forwardRef, useCallback, useId, useImperativeHandle, useRef, useState } from 'react';
 import { Upload, X, AlertCircle } from './Icons';
 
 interface FileDropZoneProps {
@@ -10,16 +10,29 @@ interface FileDropZoneProps {
   children?: React.ReactNode;
 }
 
-export default function FileDropZone({
+export interface FileDropZoneHandle {
+  /** Programmatically open the native file picker (used by e.g. "Add more files"). */
+  open: () => void;
+}
+
+const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function FileDropZone({
   onFilesSelected,
   acceptedTypes,
   maxFiles = 10,
   maxSizePerFile = 100 * 1024 * 1024, // 100MB
   className = '',
   children
-}: FileDropZoneProps) {
+}, ref) {
   const [isDragActive, setIsDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Unique ids per instance: multiple drop zones used to share id="file-input",
+  // which is invalid HTML and made getElementById open the wrong picker.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const restrictionsId = useId();
+
+  const openPicker = useCallback(() => inputRef.current?.click(), []);
+  useImperativeHandle(ref, () => ({ open: openPicker }), [openPicker]);
 
   const validateFiles = useCallback((files: File[]): { valid: File[], errors: string[] } => {
     const valid: File[] = [];
@@ -103,29 +116,31 @@ export default function FileDropZone({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => document.getElementById('file-input')?.click()}
+        onClick={openPicker}
         role="button"
         tabIndex={0}
         aria-label={`Drop files here or click to select. Accepted types: ${acceptedTypesDisplay}`}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
-            document.getElementById('file-input')?.click();
+            e.preventDefault();
+            openPicker();
           }
         }}
       >
         <input
-          id="file-input"
+          ref={inputRef}
+          id={inputId}
           type="file"
           multiple={maxFiles > 1}
           accept={acceptedTypes.join(',')}
           onChange={handleFileSelect}
           className="hidden"
-          aria-describedby="file-restrictions"
+          aria-describedby={restrictionsId}
         />
-        
+
         <div className="flex flex-col items-center space-y-4">
           <Upload className={`w-12 h-12 ${isDragActive ? 'text-primary-600' : 'text-gray-400'}`} />
-          
+
           {children || (
             <>
               <div className="text-center">
@@ -136,15 +151,15 @@ export default function FileDropZone({
                   or{' '}
                   <button
                     type="button"
-                    onClick={() => document.getElementById('file-input')?.click()}
+                    onClick={(e) => { e.stopPropagation(); openPicker(); }}
                     className="text-primary-600 hover:text-primary-700 font-medium focus:outline-none focus:underline"
                   >
                     browse to choose files
                   </button>
                 </p>
               </div>
-              
-              <div id="file-restrictions" className="text-xs text-gray-500 text-center">
+
+              <div id={restrictionsId} className="text-xs text-gray-500 text-center">
                 <p>Supported formats: {acceptedTypesDisplay}</p>
                 <p>Max {maxFiles} file{maxFiles > 1 ? 's' : ''}, {Math.round(maxSizePerFile / 1024 / 1024)}MB each</p>
               </div>
@@ -168,4 +183,6 @@ export default function FileDropZone({
       )}
     </div>
   );
-}
+});
+
+export default FileDropZone;

@@ -10,6 +10,7 @@ export default function PasswordProtectPage() {
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   // Password settings
   const [userPassword, setUserPassword] = useState('');
@@ -43,6 +44,7 @@ export default function PasswordProtectPage() {
     try {
       setProcessing(true);
       setError(null);
+      setSuccess(false);
       setProgress(0);
 
       const result = await addPasswordToPDF(file, {
@@ -68,6 +70,7 @@ export default function PasswordProtectPage() {
 
       setProgress(100);
       setProgressMessage('Complete!');
+      setSuccess(true);
     } catch (error) {
       console.error('Error adding password protection:', error);
       setError(error instanceof Error ? error.message : 'Failed to add password protection');
@@ -82,6 +85,7 @@ export default function PasswordProtectPage() {
     setProgress(0);
     setProgressMessage('');
     setError(null);
+    setSuccess(false);
     setUserPassword('');
     setOwnerPassword('');
     setPermissions({
@@ -247,6 +251,17 @@ export default function PasswordProtectPage() {
               progress={progress} 
               message={progressMessage}
             />
+          )}
+
+          {/* Success */}
+          {success && !error && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <h3 className="text-sm font-medium text-green-900">PDF protected successfully!</h3>
+              <p className="text-sm text-green-700 mt-1">
+                Your password-protected PDF has been downloaded. It now requires the password to open,
+                and the encryption was applied entirely on your device.
+              </p>
+            </div>
           )}
 
           {/* Error */}

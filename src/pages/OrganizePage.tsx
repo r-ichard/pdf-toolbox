@@ -4,6 +4,7 @@ import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import LazyThumbnail from '@/components/LazyThumbnail';
+import ErrorBanner from '@/components/ErrorBanner';
 import { Download, Check, FileText, Copy, Trash2 } from '@/components/Icons';
 import { organizePDFPages, downloadFile, getPageCount, generatePDFPreview, generatePageThumbnailsBatch } from '@/utils/pdfUtils';
 
@@ -24,14 +25,20 @@ export default function OrganizePage() {
   const [isComplete, setIsComplete] = useState(false);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
   const [draggedPageId, setDraggedPageId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelected = useCallback(async (files: File[]) => {
     const selectedFile = files[0];
     if (!selectedFile) return;
 
+    setError(null);
     const pageCount = await getPageCount(selectedFile);
+    if (pageCount === 0) {
+      setError('We couldn\'t read this PDF. It may be corrupted or password-protected — remove the password first.');
+      return;
+    }
     const preview = await generatePDFPreview(selectedFile);
-    
+
     const pdfFile: PDFFile = {
       file: selectedFile,
       id: Math.random().toString(36).substring(2, 11),
@@ -43,7 +50,7 @@ export default function OrganizePage() {
 
     setFile(pdfFile);
     setIsComplete(false);
-    
+
     // Initialize pages
     const initialPages: PageInfo[] = Array.from({ length: pageCount }, (_, i) => ({
       id: `page-${i + 1}`,
@@ -194,7 +201,8 @@ export default function OrganizePage() {
     
     setIsProcessing(true);
     setIsComplete(false);
-    
+    setError(null);
+
     try {
       // Create page operations
       const operations = pages.map((page, index) => ({
@@ -210,9 +218,9 @@ export default function OrganizePage() {
       const fileName = file.name.replace('.pdf', '_organized.pdf');
       downloadFile(organizedPdf, fileName);
       setIsComplete(true);
-    } catch (error) {
-      console.error('Organization failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during organization' });
+    } catch (err) {
+      console.error('Organization failed:', err);
+      setError('We couldn\'t apply these changes. The PDF may be corrupted or password-protected.');
     } finally {
       setIsProcessing(false);
     }
@@ -228,6 +236,8 @@ export default function OrganizePage() {
           Reorder, duplicate, or delete PDF pages with drag and drop.
         </p>
       </div>
+
+      <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       {!file ? (
         <FileDropZone

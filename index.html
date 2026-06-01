@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!--
+      Content-Security-Policy: there is intentionally NO remote origin in connect-src,
+      so document data can never leave the browser. 'wasm-unsafe-eval' enables the
+      qpdf/pdf.js WebAssembly; worker-src/blob: enables the local PDF.js worker;
+      data:/blob: img-src enables canvas-generated previews. Header-based CSP in
+      netlify.toml / vercel.json / Dockerfile adds frame-ancestors.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Free PDF Tools Online - Merge, Split, Compress PDFs | PDF Toolbox</title>
     <meta name="description" content="Free online PDF tools for merging, splitting, compressing, converting, and editing PDFs. No uploads required - all processing happens securely in your browser. Try our PDF editor now!" />

@@ -1,57 +1,18 @@
 import { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
+// Vite emits the worker as a hashed, SAME-ORIGIN asset. The worker version is
+// therefore always in lock-step with the installed pdfjs-dist, and no script or
+// document data is ever fetched from a third party — this is what keeps the app
+// "fully in-browser" and able to run offline / under a strict CSP.
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 
-// PDF.js worker configuration with robust fallback strategy
-class PDFWorkerManager {
-  private static workerSources = [
-    // Try local public directory first (works in both dev and production)
-    '/pdf.worker.min.js',
-    // Fallback to reliable CDN
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js`,
-    // Final fallback to unpkg
-    `https://unpkg.com/pdfjs-dist@4.2.67/build/pdf.worker.min.js`
-  ];
-
-  private static async testWorkerSource(src: string): Promise<boolean> {
-    try {
-      const response = await fetch(src, { method: 'HEAD' });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  static async initializeWorker(): Promise<void> {
-    if (typeof window === 'undefined') return;
-
-    // If already configured and working, skip
-    if (pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      try {
-        // Test if current worker is accessible
-        const response = await fetch(pdfjsLib.GlobalWorkerOptions.workerSrc, { method: 'HEAD' });
-        if (response.ok) return;
-      } catch {
-        // Current worker failed, continue to find a working one
-      }
-    }
-
-    for (const src of this.workerSources) {
-      if (await this.testWorkerSource(src)) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = src;
-        console.log(`PDF.js worker configured: ${src}`);
-        return;
-      }
-    }
-
-    console.warn('No working PDF.js worker source found. PDF preview may not work.');
-  }
-}
-
-// Initialize worker when module loads
-if (typeof window !== 'undefined') {
-  PDFWorkerManager.initializeWorker().catch(console.warn);
+// Configure the PDF.js worker exactly once, from our own origin. There is
+// deliberately NO CDN fallback: a missing worker is surfaced as a normal error
+// rather than silently reaching out to the network.
+if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 
 export interface ProcessingOptions {
@@ -125,16 +86,18 @@ export async function splitPDF(file: File, options: SplitOptions): Promise<{ nam
   if (mode === 'pages' && pages) {
     for (let i = 0; i < pages.length; i++) {
       const pageNum = pages[i];
-      if (pageNum <= totalPages) {
+      // Guard BOTH bounds (1-based). Without the lower guard, page 0/negative produced
+      // a copyPages index of -1 and crashed the entire split.
+      if (pageNum >= 1 && pageNum <= totalPages) {
         onProgress?.((i / pages.length) * 80 + 10, `Extracting page ${pageNum}...`);
-        
+
         const newPdf = await PDFDocument.create();
         const [copiedPage] = await newPdf.copyPages(pdf, [pageNum - 1]);
         newPdf.addPage(copiedPage);
-        
+
         const pdfBytes = await newPdf.save();
         results.push({
-          name: `${file.name.replace('.pdf', '')}_page_${pageNum}.pdf`,
+          name: `${file.name.replace(/\.pdf$/i, '')}_page_${pageNum}.pdf`,
           data: pdfBytes
         });
       }
@@ -146,9 +109,9 @@ export async function splitPDF(file: File, options: SplitOptions): Promise<{ nam
       
       const newPdf = await PDFDocument.create();
       const pageIndices = Array.from(
-        { length: range.end - range.start + 1 }, 
+        { length: range.end - range.start + 1 },
         (_, j) => range.start - 1 + j
-      ).filter(idx => idx < totalPages);
+      ).filter(idx => idx >= 0 && idx < totalPages);
       
       const copiedPages = await newPdf.copyPages(pdf, pageIndices);
       copiedPages.forEach(page => newPdf.addPage(page));
@@ -184,87 +147,123 @@ export async function splitPDF(file: File, options: SplitOptions): Promise<{ nam
   return results;
 }
 
-export async function compressPDF(file: File, options: CompressionOptions): Promise<Uint8Array> {
+export type CompressionMethod = 'none' | 'lossless' | 'rasterized';
+
+export interface CompressionResult {
+  data: Uint8Array;
+  originalSize: number;
+  compressedSize: number;
+  method: CompressionMethod;
+}
+
+function dataURLToUint8Array(dataURL: string): Uint8Array {
+  const base64 = dataURL.split(',')[1] ?? '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// Aggressive path: render each page to a JPEG and rebuild the PDF. This shrinks
+// image-heavy/scanned PDFs dramatically. It rasterizes text (no longer selectable),
+// so the caller only KEEPS this result when it is meaningfully smaller. Browser-only.
+async function rasterizeToPdf(
+  sourceBytes: Uint8Array,
+  dpi: number,
+  jpegQuality: number,
+  onProgress?: (progress: number, message: string) => void
+): Promise<Uint8Array | null> {
+  if (typeof document === 'undefined') return null; // no canvas (e.g. Node test env)
+
+  const pdf = await pdfjsLib.getDocument({ data: sourceBytes.slice() }).promise;
+  if (!pdf.numPages) {
+    pdf.destroy();
+    return null;
+  }
+
+  const out = await PDFDocument.create();
+  const scale = dpi / 72;
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    onProgress?.(40 + (pageNum / pdf.numPages) * 50, `Re-encoding page ${pageNum}/${pdf.numPages}...`);
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) continue;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    // JPEG has no alpha — paint a white background so transparent areas don't go black.
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const jpgBytes = dataURLToUint8Array(canvas.toDataURL('image/jpeg', jpegQuality));
+    const img = await out.embedJpg(jpgBytes);
+
+    const pointSize = page.getViewport({ scale: 1 }); // page size in PDF points
+    const outPage = out.addPage([pointSize.width, pointSize.height]);
+    outPage.drawImage(img, { x: 0, y: 0, width: pointSize.width, height: pointSize.height });
+  }
+
+  pdf.destroy();
+  return out.save({ useObjectStreams: true });
+}
+
+/**
+ * Compress a PDF entirely in the browser, guaranteeing the output is NEVER larger
+ * than the input (it returns the smallest of: original, lossless re-save, and — for
+ * medium/high — a rasterized re-encode that is only kept when it's clearly smaller).
+ */
+export async function compressPDFDetailed(file: File, options: CompressionOptions): Promise<CompressionResult> {
   const { onProgress, quality = 'medium' } = options;
-  
-  onProgress?.(10, 'Loading PDF...');
+
+  onProgress?.(5, 'Loading PDF...');
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  
-  onProgress?.(30, 'Analyzing PDF structure...');
-  
-  // Get all pages for processing
-  const pages = pdf.getPages();
-  
-  onProgress?.(50, 'Optimizing PDF structure...');
-  
-  // Create a new PDF with optimized settings
-  const optimizedPdf = await PDFDocument.create();
-  
-  // Copy pages one by one with optimization
-  for (let i = 0; i < pages.length; i++) {
-    onProgress?.(50 + (i / pages.length) * 30, `Processing page ${i + 1}/${pages.length}...`);
-    
-    // Copy the page
-    const [copiedPage] = await optimizedPdf.copyPages(pdf, [i]);
-    optimizedPdf.addPage(copiedPage);
-  }
-  
-  // Copy metadata but optimize it
+  const originalBytes = new Uint8Array(arrayBuffer);
+
+  let best = originalBytes;
+  let method: CompressionMethod = 'none';
+
+  // 1) Lossless structural optimization (object streams + dropped bloat). Always safe.
+  onProgress?.(20, 'Optimizing structure...');
   try {
-    const title = pdf.getTitle();
-    const author = pdf.getAuthor();
-    const subject = pdf.getSubject();
-    
-    if (title && title.length < 500) optimizedPdf.setTitle(title);
-    if (author && author.length < 200) optimizedPdf.setAuthor(author);
-    if (subject && subject.length < 500) optimizedPdf.setSubject(subject);
-    
-    optimizedPdf.setCreator('PDF Toolbox Web');
-    optimizedPdf.setProducer('PDF Toolbox Web - Optimized');
+    const src = await PDFDocument.load(arrayBuffer);
+    src.setProducer('PDF Toolbox Web');
+    const lossless = await src.save({ useObjectStreams: true, addDefaultPage: false, objectsPerTick: 100 });
+    if (lossless.length < best.length) {
+      best = lossless;
+      method = 'lossless';
+    }
   } catch (error) {
-    // Metadata copying failed, continue without it
-    console.warn('Could not copy metadata during compression:', error);
+    console.warn('Lossless optimization skipped:', error);
   }
-  
-  onProgress?.(85, 'Applying compression settings...');
-  
-  // Configure compression settings based on quality
-  let saveOptions: any = {
-    useObjectStreams: true,
-    addDefaultPage: false,
-    objectsPerTick: 50,
-  };
-  
-  switch (quality) {
-    case 'low':
-      // Maximum compression, lower quality
-      saveOptions = {
-        ...saveOptions,
-        useObjectStreams: true,
-      };
-      break;
-    case 'medium':
-      // Balanced compression
-      saveOptions = {
-        ...saveOptions,
-        useObjectStreams: true,
-      };
-      break;
-    case 'high':
-      // Minimal compression, preserve quality
-      saveOptions = {
-        ...saveOptions,
-        useObjectStreams: false,
-      };
-      break;
+
+  // 2) Aggressive image re-encode for medium/high — kept only if >=10% smaller than
+  //    the best lossless result, so we don't rasterize crisp text for a trivial gain.
+  if (quality !== 'low') {
+    onProgress?.(40, 'Re-encoding pages...');
+    try {
+      const dpi = quality === 'high' ? 100 : 144;
+      const jpegQuality = quality === 'high' ? 0.5 : 0.7;
+      const rasterized = await rasterizeToPdf(originalBytes, dpi, jpegQuality, onProgress);
+      if (rasterized && rasterized.length < best.length * 0.9) {
+        best = rasterized;
+        method = 'rasterized';
+      }
+    } catch (error) {
+      console.warn('Aggressive compression unavailable, kept lossless result:', error);
+    }
   }
-  
-  onProgress?.(95, 'Finalizing compressed PDF...');
-  const pdfBytes = await optimizedPdf.save(saveOptions);
-  
+
   onProgress?.(100, 'Complete!');
-  return pdfBytes;
+  return { data: best, originalSize: originalBytes.length, compressedSize: best.length, method };
+}
+
+export async function compressPDF(file: File, options: CompressionOptions): Promise<Uint8Array> {
+  return (await compressPDFDetailed(file, options)).data;
 }
 
 export async function rotatePDF(
@@ -281,14 +280,19 @@ export async function rotatePDF(
   const pages = pdf.getPages();
   
   onProgress?.(50, 'Rotating pages...');
-  
+
   pageNumbers.forEach(pageNum => {
-    if (pageNum <= pages.length) {
+    // Guard both bounds (1-based). Rotation is ADDITIVE: we add to whatever rotation
+    // the page already has (e.g. a scanned page with /Rotate 90) so the result matches
+    // what the user saw in the preview, instead of overwriting the original orientation.
+    if (pageNum >= 1 && pageNum <= pages.length) {
       const page = pages[pageNum - 1];
-      page.setRotation(degrees(angle));
+      const current = page.getRotation().angle || 0;
+      const next = ((current + angle) % 360 + 360) % 360;
+      page.setRotation(degrees(next));
     }
   });
-  
+
   onProgress?.(90, 'Saving PDF...');
   const pdfBytes = await pdf.save();
   onProgress?.(100, 'Complete!');
@@ -312,28 +316,22 @@ export async function addPasswordToPDF(
   file: File,
   options: PasswordProtectionOptions = {}
 ): Promise<Uint8Array> {
-  const { userPassword, ownerPassword, onProgress } = options;
-  
-  onProgress?.(10, 'Loading PDF...');
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  
-  onProgress?.(30, 'Applying password protection...');
-  
-  // Note: PDF encryption is complex and may require additional libraries
-  // For now, we'll create a basic implementation that warns about limited support
-  if (userPassword || ownerPassword) {
-    // pdf-lib doesn't support encryption directly in older versions
-    // This is a placeholder for future implementation
-    console.warn('Password protection requires pdf-lib with encryption support');
-    throw new Error('Password protection is not fully supported in this version. Please use a PDF editor that supports encryption.');
+  const { userPassword, ownerPassword, permissions, onProgress } = options;
+
+  if (!userPassword && !ownerPassword) {
+    throw new Error('Please enter at least one password to protect the PDF.');
   }
-  
-  onProgress?.(80, 'Saving protected PDF...');
-  const pdfBytes = await pdf.save();
+
+  onProgress?.(10, 'Loading PDF...');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  onProgress?.(40, 'Encrypting PDF...');
+  // Real 256-bit AES encryption via qpdf-wasm, lazily code-split and run fully in-browser.
+  const { encryptPDF } = await import('./qpdf');
+  const result = await encryptPDF(bytes, { userPassword, ownerPassword, permissions });
+
   onProgress?.(100, 'Complete!');
-  
-  return pdfBytes;
+  return result;
 }
 
 export interface PasswordRemovalOptions {
@@ -346,55 +344,18 @@ export async function removePasswordFromPDF(
   options: PasswordRemovalOptions = {}
 ): Promise<Uint8Array> {
   const { password, onProgress } = options;
-  
+
   onProgress?.(10, 'Loading PDF...');
-  const arrayBuffer = await file.arrayBuffer();
-  
-  onProgress?.(30, 'Decrypting PDF...');
-  // Load the PDF - note: password support depends on pdf-lib version
-  let pdf;
-  try {
-    pdf = await PDFDocument.load(arrayBuffer);
-  } catch (error) {
-    if (password) {
-      throw new Error('Password-protected PDF decryption is not fully supported in this version. The PDF may be encrypted.');
-    }
-    throw error;
-  }
-  
-  onProgress?.(60, 'Creating unprotected PDF...');
-  // Create a new PDF without encryption
-  const newPdf = await PDFDocument.create();
-  
-  // Copy all pages from the original PDF
-  const pageIndices = Array.from({ length: pdf.getPageCount() }, (_, i) => i);
-  const copiedPages = await newPdf.copyPages(pdf, pageIndices);
-  
-  copiedPages.forEach((page) => {
-    newPdf.addPage(page);
-  });
-  
-  // Copy metadata if available
-  try {
-    const title = pdf.getTitle();
-    const author = pdf.getAuthor();
-    const subject = pdf.getSubject();
-    const creator = pdf.getCreator();
-    
-    if (title) newPdf.setTitle(title);
-    if (author) newPdf.setAuthor(author);
-    if (subject) newPdf.setSubject(subject);
-    if (creator) newPdf.setCreator(creator);
-  } catch (error) {
-    // Metadata copying failed, continue without it
-    console.warn('Could not copy PDF metadata:', error);
-  }
-  
-  onProgress?.(90, 'Saving unprotected PDF...');
-  const pdfBytes = await newPdf.save();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  onProgress?.(40, 'Removing password...');
+  // qpdf actually decrypts using the supplied password (in-browser); a wrong password
+  // surfaces a clear "Incorrect password" error instead of silently producing junk.
+  const { decryptPDF } = await import('./qpdf');
+  const result = await decryptPDF(bytes, password ?? '');
+
   onProgress?.(100, 'Complete!');
-  
-  return pdfBytes;
+  return result;
 }
 
 export async function getPageCount(file: File): Promise<number> {
@@ -408,13 +369,8 @@ export async function getPageCount(file: File): Promise<number> {
   }
 }
 
-export async function generatePDFPreview(file: File, pageNumber: number = 1, retryCount: number = 0): Promise<string> {
-  const maxRetries = 2;
-  
+export async function generatePDFPreview(file: File, pageNumber: number = 1): Promise<string> {
   try {
-    // Ensure worker is initialized before proceeding
-    await PDFWorkerManager.initializeWorker();
-    
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ 
       data: arrayBuffer,
@@ -445,21 +401,10 @@ export async function generatePDFPreview(file: File, pageNumber: number = 1, ret
     
     // Clean up
     pdf.destroy();
-    
+
     return canvas.toDataURL('image/jpeg', 0.85);
   } catch (error) {
     console.error('Error generating preview:', error);
-    
-    // Retry logic for worker issues
-    if (retryCount < maxRetries && error instanceof Error && 
-        (error.message.includes('worker') || error.message.includes('Worker'))) {
-      console.log(`Retrying PDF preview generation (attempt ${retryCount + 1}/${maxRetries})`);
-      // Force worker reinitialization
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return generatePDFPreview(file, pageNumber, retryCount + 1);
-    }
-    
     return '';
   }
 }
@@ -540,17 +485,13 @@ export async function generateAllPagePreviews(
 }
 
 export async function generatePagePreview(
-  file: File, 
+  file: File,
   pageNumber: number,
-  options: { scale?: number; format?: 'png' | 'jpeg'; quality?: number; retryCount?: number } = {}
+  options: { scale?: number; format?: 'png' | 'jpeg'; quality?: number } = {}
 ): Promise<string> {
-  const { scale = 1.2, format = 'png', quality = 1.0, retryCount = 0 } = options;
-  const maxRetries = 2;
-  
+  const { scale = 1.2, format = 'png', quality = 1.0 } = options;
+
   try {
-    // Ensure worker is initialized before proceeding
-    await PDFWorkerManager.initializeWorker();
-    
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ 
       data: arrayBuffer,
@@ -583,17 +524,6 @@ export async function generatePagePreview(
     return canvas.toDataURL(mimeType, quality);
   } catch (error) {
     console.error(`Error generating preview for page ${pageNumber}:`, error);
-    
-    // Retry logic for worker issues
-    if (retryCount < maxRetries && error instanceof Error && 
-        (error.message.includes('worker') || error.message.includes('Worker'))) {
-      console.log(`Retrying page ${pageNumber} preview generation (attempt ${retryCount + 1}/${maxRetries})`);
-      // Force worker reinitialization
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return generatePagePreview(file, pageNumber, { ...options, retryCount: retryCount + 1 });
-    }
-    
     return '';
   }
 }
@@ -659,74 +589,98 @@ export interface WatermarkOptions extends ProcessingOptions {
   imageFile?: File;
 }
 
+// Parse a CSS-ish hex color into pdf-lib's 0..1 rgb. Accepts #rgb, #rrggbb, with or
+// without '#'. Returns null for anything invalid so callers never feed NaN into rgb()
+// (which throws). This is what kept a typed color like "red" from crashing watermarking.
+export function parseHexColor(input: string): { r: number; g: number; b: number } | null {
+  let hex = (input || '').trim().replace(/^#/, '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+  return {
+    r: parseInt(hex.slice(0, 2), 16) / 255,
+    g: parseInt(hex.slice(2, 4), 16) / 255,
+    b: parseInt(hex.slice(4, 6), 16) / 255,
+  };
+}
+
+// Decide how to embed an image watermark by sniffing magic bytes (not the MIME/extension,
+// which can lie). Throws a clear error for anything that isn't PNG or JPEG so the UI can
+// tell the user instead of silently producing a watermark-free "success".
+async function embedWatermarkImage(pdfDoc: PDFDocument, imageFile: File) {
+  const bytes = new Uint8Array(await imageFile.arrayBuffer());
+  const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  const isJpg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (isPng) return pdfDoc.embedPng(bytes);
+  if (isJpg) return pdfDoc.embedJpg(bytes);
+  throw new Error('Unsupported watermark image. Please use a PNG or JPEG image.');
+}
+
 export async function addWatermarkToPDF(file: File, options: WatermarkOptions): Promise<Uint8Array> {
-  const { onProgress, type, content, opacity, position, pages, fontSize = 24, fontColor = '#000000' } = options;
-  
+  const { onProgress, type, content, position, pages, fontSize = 24, fontColor = '#000000' } = options;
+  const opacity = Math.min(1, Math.max(0.05, options.opacity)); // clamp to a sane, visible range
+
   onProgress?.(10, 'Loading PDF...');
   const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer);
   const totalPages = pdfDoc.getPageCount();
-  
+
   const pagesToProcess = pages || Array.from({ length: totalPages }, (_, i) => i + 1);
-  
+
   onProgress?.(20, 'Preparing watermark...');
-  
+
   let watermarkImage;
-  if (type === 'image' && options.imageFile) {
-    const imageBytes = await options.imageFile.arrayBuffer();
-    if (options.imageFile.type === 'image/png') {
-      watermarkImage = await pdfDoc.embedPng(imageBytes);
-    } else if (options.imageFile.type === 'image/jpeg') {
-      watermarkImage = await pdfDoc.embedJpg(imageBytes);
-    }
+  if (type === 'image') {
+    if (!options.imageFile) throw new Error('Please choose an image for the watermark.');
+    watermarkImage = await embedWatermarkImage(pdfDoc, options.imageFile);
   }
-  
+
+  // Validate the text color up-front so we fail fast with a clear message rather than mid-loop.
+  const color = type === 'text' ? parseHexColor(fontColor) : { r: 0, g: 0, b: 0 };
+  if (type === 'text' && !color) {
+    throw new Error(`Invalid watermark color "${fontColor}". Use a hex value like #ff0000.`);
+  }
+
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  
+
   let processedCount = 0;
-  
+
   for (const pageNum of pagesToProcess) {
-    if (pageNum > totalPages) continue;
-    
+    if (pageNum < 1 || pageNum > totalPages) continue;
+
     onProgress?.(
       20 + (processedCount / pagesToProcess.length) * 70,
       `Adding watermark to page ${pageNum}...`
     );
-    
+
     const page = pdfDoc.getPages()[pageNum - 1];
     const { width, height } = page.getSize();
-    
-    // Calculate position (relative to page size)
-    const xPos = (position.x / 100) * width;
-    const yPos = ((100 - position.y) / 100) * height; // Flip Y coordinate
-    
+
+    // Treat the chosen position as the CENTER of the watermark (matches the UI preview,
+    // which centers via translate(-50%, -50%)).
+    const xCenter = (position.x / 100) * width;
+    const yCenter = ((100 - position.y) / 100) * height; // Flip Y for PDF coordinate space
+
     if (type === 'text') {
-      // Parse color
-      const colorHex = fontColor.replace('#', '');
-      const r = parseInt(colorHex.substring(0, 2), 16) / 255;
-      const g = parseInt(colorHex.substring(2, 4), 16) / 255;
-      const b = parseInt(colorHex.substring(4, 6), 16) / 255;
-      
+      const textWidth = font.widthOfTextAtSize(content, fontSize);
       page.drawText(content, {
-        x: xPos,
-        y: yPos,
+        x: xCenter - textWidth / 2,
+        y: yCenter - fontSize / 2,
         size: fontSize,
-        font: font,
-        color: rgb(r, g, b),
-        opacity: opacity
+        font,
+        color: rgb(color!.r, color!.g, color!.b),
+        opacity,
       });
-    } else if (type === 'image' && watermarkImage) {
+    } else if (watermarkImage) {
       const imageScale = Math.min(width * 0.3 / watermarkImage.width, height * 0.3 / watermarkImage.height);
-      
       page.drawImage(watermarkImage, {
-        x: xPos - (watermarkImage.width * imageScale) / 2,
-        y: yPos - (watermarkImage.height * imageScale) / 2,
+        x: xCenter - (watermarkImage.width * imageScale) / 2,
+        y: yCenter - (watermarkImage.height * imageScale) / 2,
         width: watermarkImage.width * imageScale,
         height: watermarkImage.height * imageScale,
-        opacity: opacity
+        opacity,
       });
     }
-    
+
     processedCount++;
   }
   

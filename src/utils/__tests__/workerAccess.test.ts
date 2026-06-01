@@ -1,70 +1,34 @@
+/**
+ * Worker configuration tests. The app no longer probes the network or falls back
+ * to a CDN for the PDF.js worker — it is bundled by Vite and served from our own
+ * origin. These tests guard that privacy/offline guarantee: the configured worker
+ * must be same-origin and must never point at a third party.
+ */
 import { describe, it, expect, vi } from 'vitest';
 
-describe('PDF Worker Accessibility', () => {
-  it('should have PDF worker file in public directory', async () => {
-    // Mock fetch to simulate checking if worker file exists
-    const mockFetch = vi.fn();
-    global.fetch = mockFetch;
+// Light pdfjs mock so importing pdfUtils doesn't need a real worker/canvas.
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: { workerSrc: '' },
+  getDocument: vi.fn(() => ({ promise: Promise.resolve({ numPages: 0, getPage: vi.fn(), destroy: vi.fn() }) })),
+  version: '4.10.38',
+}));
+vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
-    // Test local worker access
-    mockFetch.mockResolvedValueOnce({ ok: true });
-    
-    const response = await fetch('/pdf.worker.min.js', { method: 'HEAD' });
-    
-    expect(response.ok).toBe(true);
-    expect(mockFetch).toHaveBeenCalledWith('/pdf.worker.min.js', { method: 'HEAD' });
+import * as pdfjsLib from 'pdfjs-dist';
+import '../pdfUtils'; // side effect: configures GlobalWorkerOptions.workerSrc on import
+
+describe('PDF.js worker configuration', () => {
+  it('configures a worker source on module load', () => {
+    expect(pdfjsLib.GlobalWorkerOptions.workerSrc).toBeTruthy();
+    expect(typeof pdfjsLib.GlobalWorkerOptions.workerSrc).toBe('string');
   });
 
-  it('should fallback to CDN when local worker is not available', async () => {
-    const mockFetch = vi.fn();
-    global.fetch = mockFetch;
-
-    // First call (local) fails, second (CDN) succeeds
-    mockFetch
-      .mockRejectedValueOnce(new Error('404'))
-      .mockResolvedValueOnce({ ok: true });
-    
-    // Test CDN fallback
-    try {
-      await fetch('/pdf.worker.min.js', { method: 'HEAD' });
-    } catch {
-      // Local failed, try CDN
-      const cdnResponse = await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js', { method: 'HEAD' });
-      expect(cdnResponse.ok).toBe(true);
-    }
+  it('never points at an external CDN (fully in-browser / offline-safe)', () => {
+    const src = String(pdfjsLib.GlobalWorkerOptions.workerSrc);
+    expect(src).not.toMatch(/cdnjs|unpkg|jsdelivr|https?:\/\//i);
   });
 
-  it('should handle network failures gracefully', async () => {
-    const mockFetch = vi.fn();
-    global.fetch = mockFetch;
-
-    mockFetch.mockRejectedValue(new Error('Network error'));
-    
-    try {
-      await fetch('/pdf.worker.min.js', { method: 'HEAD' });
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toBe('Network error');
-    }
-  });
-
-  it('should validate worker sources are properly configured', () => {
-    const workerSources = [
-      '/pdf.worker.min.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js',
-      'https://unpkg.com/pdfjs-dist@4.2.67/build/pdf.worker.min.js'
-    ];
-
-    workerSources.forEach(src => {
-      expect(src).toBeTruthy();
-      expect(typeof src).toBe('string');
-      expect(src.length).toBeGreaterThan(0);
-      
-      if (src.startsWith('http')) {
-        expect(src).toMatch(/^https?:\/\/.+\.js$/);
-      } else {
-        expect(src).toMatch(/^\/.*\.js$/);
-      }
-    });
+  it('references the bundled pdf worker asset', () => {
+    expect(String(pdfjsLib.GlobalWorkerOptions.workerSrc)).toMatch(/pdf\.worker/i);
   });
 });
