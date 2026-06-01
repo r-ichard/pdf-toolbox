@@ -38,12 +38,10 @@ const mockCanvas: any = {
   width: 100
 };
 
-Object.defineProperty(global, 'document', {
-  value: {
-    createElement: vi.fn(() => mockCanvas)
-  },
-  writable: true
-});
+// Mock ONLY <canvas>; delegate other tags to happy-dom so window teardown can append elements.
+const baseCreateElement = global.document.createElement.bind(global.document);
+vi.spyOn(global.document, 'createElement').mockImplementation(((tag: string) =>
+  tag === 'canvas' ? mockCanvas : baseCreateElement(tag)) as any);
 
 // Import after mocks are set up
 import { generatePDFPreview } from '../pdfUtils';

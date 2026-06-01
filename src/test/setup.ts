@@ -187,6 +187,6 @@ Object.assign(global.window, {
   }))
 })
 
-// Note: This setup file configures mocks for DOM APIs required by PDF processing tests
-// The 3 unhandled DOM teardown errors shown in test output are from happy-dom library
-// cleanup and do not affect test reliability or application functionality
+// Note: This setup file configures mocks for DOM APIs required by PDF processing tests.
+// Test files that need a fake <canvas> should mock ONLY the 'canvas' tag and delegate other
+// tags to the real document — otherwise happy-dom's window teardown throws on appendChild.

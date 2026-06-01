@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mergePDFs, getPageCount, generatePDFPreview, rotatePDF } from '../pdfUtils'
 
-// Mock DOM globals
-Object.defineProperty(global, 'document', {
-  value: {
-    createElement: vi.fn().mockReturnValue({
-      getContext: vi.fn().mockReturnValue({}),
-      toDataURL: vi.fn().mockReturnValue('data:image/png;base64,mock'),
-      width: 0,
-      height: 0,
-    })
-  }
-})
+// Mock ONLY <canvas> creation; delegate every other tag to happy-dom's real document so
+// that window teardown (which creates and appends elements) doesn't throw.
+const baseCreateElement = global.document.createElement.bind(global.document)
+vi.spyOn(global.document, 'createElement').mockImplementation(((tag: string) =>
+  tag === 'canvas'
+    ? {
+        getContext: vi.fn().mockReturnValue({}),
+        toDataURL: vi.fn().mockReturnValue('data:image/png;base64,mock'),
+        width: 0,
+        height: 0,
+      }
+    : baseCreateElement(tag)) as any)
 
 // Mock fetch for worker initialization
 global.fetch = vi.fn().mockResolvedValue({

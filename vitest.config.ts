@@ -17,8 +17,6 @@ export default defineConfig({
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
       '**/e2e/**'  // Exclude E2E tests from Vitest
     ],
-    // Note: 3 harmless DOM teardown errors from happy-dom library are expected
-    // These do not affect test reliability or application functionality
   },
   resolve: {
     alias: {
