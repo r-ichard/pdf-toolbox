@@ -8,12 +8,12 @@ test.describe('PDF Thumbnail Functionality', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     // Wait for the page to fully load
-    await expect(page.locator('h1:has-text("Free PDF Tools")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Free Online PDF Tools")')).toBeVisible();
   });
 
   test('Split page shows individual page thumbnails', async ({ page }) => {
     // Navigate to split page by clicking the Split PDF card
-    await page.locator('a:has-text("Split PDF")').click();
+    await page.locator('a:has-text("Split PDF")').first().click();
     await expect(page).toHaveURL('/split');
 
     // Upload a PDF file
@@ -53,7 +53,7 @@ test.describe('PDF Thumbnail Functionality', () => {
 
   test('Organize page shows individual page thumbnails', async ({ page }) => {
     // Navigate to organize page by clicking the Organize Pages card
-    await page.locator('a:has-text("Organize Pages")').click();
+    await page.locator('a[href="/organize"]').first().click();
     await expect(page).toHaveURL('/organize');
 
     // Upload a PDF file
@@ -97,7 +97,7 @@ test.describe('PDF Thumbnail Functionality', () => {
 
   test('Basic thumbnail functionality works', async ({ page }) => {
     // Navigate to split page and upload file
-    await page.locator('a:has-text("Split PDF")').click();
+    await page.locator('a:has-text("Split PDF")').first().click();
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(testPdfPath);
 

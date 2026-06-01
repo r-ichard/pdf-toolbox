@@ -7,10 +7,10 @@ test.describe('PDF Thumbnail Basic Tests', () => {
   test('Can generate thumbnails for split page', async ({ page }) => {
     // Go to home page
     await page.goto('/');
-    await expect(page.locator('text=Free PDF Tools')).toBeVisible();
+    await expect(page.locator('h1:has-text("Free Online PDF Tools")')).toBeVisible();
 
     // Navigate to split page
-    await page.locator('a:has-text("Split PDF")').click();
+    await page.locator('a:has-text("Split PDF")').first().click();
     await expect(page).toHaveURL('/split');
 
     // Upload a PDF file
@@ -40,10 +40,10 @@ test.describe('PDF Thumbnail Basic Tests', () => {
   test('Can generate thumbnails for organize page', async ({ page }) => {
     // Go to home page
     await page.goto('/');
-    await expect(page.locator('text=Free PDF Tools')).toBeVisible();
+    await expect(page.locator('h1:has-text("Free Online PDF Tools")')).toBeVisible();
 
     // Navigate to organize page
-    await page.locator('a:has-text("Organize Pages")').click();
+    await page.locator('a[href="/organize"]').first().click();
     await expect(page).toHaveURL('/organize');
 
     // Upload a PDF file
