@@ -4,25 +4,25 @@ import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Download, Check, FileText, Compress } from '@/components/Icons';
-import { compressPDF, downloadFile, getPageCount, generatePDFPreview } from '@/utils/pdfUtils';
+import { compressPDFDetailed, downloadFile, getPageCount, generatePDFPreview, CompressionMethod } from '@/utils/pdfUtils';
 
 const compressionLevels: CompressionLevel[] = [
   {
     id: 'low',
-    name: 'Low Compression',
-    description: 'Best quality, larger file size',
+    name: 'Lossless',
+    description: 'Optimize structure only — text stays selectable. Best for text PDFs.',
     quality: 0.9
   },
   {
     id: 'medium',
-    name: 'Medium Compression',
-    description: 'Balanced quality and size',
+    name: 'Balanced',
+    description: 'Re-encodes page images when it helps. Great for scans & photo-heavy PDFs.',
     quality: 0.7
   },
   {
     id: 'high',
-    name: 'High Compression',
-    description: 'Smallest size, reduced quality',
+    name: 'Maximum',
+    description: 'Smallest size; rasterizes pages (text becomes an image).',
     quality: 0.5
   }
 ];
@@ -34,6 +34,8 @@ export default function CompressPage() {
   const [progress, setProgress] = useState<ProcessingProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [compressedSize, setCompressedSize] = useState<number | null>(null);
+  const [compressionMethod, setCompressionMethod] = useState<CompressionMethod | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelected = useCallback(async (files: File[]) => {
     const selectedFile = files[0];
@@ -58,42 +60,46 @@ export default function CompressPage() {
 
   const handleCompress = async () => {
     if (!file) return;
-    
+
     setIsProcessing(true);
     setIsComplete(false);
     setCompressedSize(null);
-    
+    setCompressionMethod(null);
+    setError(null);
+
     try {
-      const compressedPdf = await compressPDF(file.file, {
+      const result = await compressPDFDetailed(file.file, {
         quality: selectedLevel.id,
         onProgress: (current, message) => setProgress({ current, total: 100, message })
       });
-      
-      const fileName = file.name.replace('.pdf', '_compressed.pdf');
-      setCompressedSize(compressedPdf.byteLength);
-      
-      downloadFile(compressedPdf, fileName);
+
+      const fileName = file.name.replace(/\.pdf$/i, '') + '_compressed.pdf';
+      setCompressedSize(result.compressedSize);
+      setCompressionMethod(result.method);
+
+      downloadFile(result.data, fileName);
       setIsComplete(true);
-    } catch (error) {
-      console.error('Compression failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during compression' });
+    } catch (err) {
+      console.error('Compression failed:', err);
+      setError('We couldn\'t compress this PDF. It may be corrupted or password-protected — try removing the password first.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes <= 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // compressPDFDetailed guarantees compressedSize <= original, so savedBytes is never negative.
   const calculateSizeReduction = (): { percentage: number; savedBytes: number } => {
     if (!file || !compressedSize) return { percentage: 0, savedBytes: 0 };
-    const savedBytes = file.size - compressedSize;
-    const percentage = (savedBytes / file.size) * 100;
+    const savedBytes = Math.max(0, file.size - compressedSize);
+    const percentage = file.size > 0 ? (savedBytes / file.size) * 100 : 0;
     return { percentage, savedBytes };
   };
 
@@ -183,29 +189,25 @@ export default function CompressPage() {
             </div>
           </div>
 
-          {/* Estimated Compression */}
+          {/* Selected level info — no fabricated estimate; actual savings are measured after compression */}
           <div className="card bg-blue-50 border-blue-200">
             <div className="text-center space-y-2">
               <h4 className="font-medium text-blue-900">Selected: {selectedLevel.name}</h4>
               <p className="text-sm text-blue-700">{selectedLevel.description}</p>
-              <div className="flex items-center justify-center space-x-4 mt-4">
-                <div className="text-center">
-                  <p className="text-lg font-bold text-blue-900">{formatFileSize(file.size)}</p>
-                  <p className="text-xs text-blue-600">Current Size</p>
-                </div>
-                <div className="text-blue-400">→</div>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-blue-900">
-                    ~{formatFileSize(Math.round(file.size * selectedLevel.quality))}
-                  </p>
-                  <p className="text-xs text-blue-600">Estimated Size</p>
-                </div>
-              </div>
               <p className="text-xs text-blue-600 mt-2">
-                Estimated reduction: ~{Math.round((1 - selectedLevel.quality) * 100)}%
+                Current size: {formatFileSize(file.size)}. Compression results depend on the PDF's
+                contents — the exact savings are shown after it runs, and the file is never made larger.
               </p>
             </div>
           </div>
+
+          {/* Error */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <p className="text-sm font-medium text-red-800">Couldn't compress this PDF</p>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          )}
 
           {/* Processing */}
           {isProcessing && (
@@ -221,7 +223,7 @@ export default function CompressPage() {
           )}
 
           {/* Success with Results */}
-          {isComplete && compressedSize && (
+          {isComplete && compressedSize !== null && (
             <div className="card bg-green-50 border-green-200">
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
@@ -229,11 +231,23 @@ export default function CompressPage() {
                     <Check className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-green-900">PDF compressed successfully!</p>
-                    <p className="text-sm text-green-700">Your compressed PDF has been downloaded.</p>
+                    {compressionMethod === 'none' ? (
+                      <>
+                        <p className="font-medium text-green-900">Already optimized</p>
+                        <p className="text-sm text-green-700">
+                          This PDF is already as small as lossless compression can make it — we downloaded
+                          your original unchanged rather than make it larger.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium text-green-900">PDF compressed successfully!</p>
+                        <p className="text-sm text-green-700">Your compressed PDF has been downloaded.</p>
+                      </>
+                    )}
                   </div>
                 </div>
-                
+
                 {/* Size Comparison */}
                 <div className="bg-white rounded-lg p-4 border border-green-200">
                   <h4 className="font-medium text-gray-900 mb-3">Compression Results</h4>
@@ -244,20 +258,28 @@ export default function CompressPage() {
                     </div>
                     <div>
                       <p className="text-lg font-bold text-primary-600">{formatFileSize(compressedSize)}</p>
-                      <p className="text-xs text-gray-600">Compressed Size</p>
+                      <p className="text-xs text-gray-600">New Size</p>
                     </div>
                     <div>
                       <p className="text-lg font-bold text-green-600">
-                        -{sizeReduction.percentage.toFixed(1)}%
+                        {sizeReduction.percentage > 0 ? `−${sizeReduction.percentage.toFixed(1)}%` : '0%'}
                       </p>
                       <p className="text-xs text-gray-600">Size Reduction</p>
                     </div>
                   </div>
-                  <div className="mt-3 text-center">
-                    <p className="text-sm text-gray-600">
-                      You saved {formatFileSize(sizeReduction.savedBytes)} of disk space
+                  {sizeReduction.savedBytes > 0 && (
+                    <div className="mt-3 text-center">
+                      <p className="text-sm text-gray-600">
+                        You saved {formatFileSize(sizeReduction.savedBytes)} of disk space
+                      </p>
+                    </div>
+                  )}
+                  {compressionMethod === 'rasterized' && (
+                    <p className="mt-3 text-center text-xs text-amber-700">
+                      Pages were re-encoded as images to reach this size, so text is no longer selectable.
+                      Choose “Lossless” if you need to keep selectable text.
                     </p>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

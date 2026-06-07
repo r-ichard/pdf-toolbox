@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Navigation and Routing', () => {
   const routes = [
-    { path: '/', title: 'PDF Toolbox' },
+    { path: '/', title: 'PDF Tools' },
     { path: '/merge', title: 'Merge PDFs' },
     { path: '/split', title: 'Split PDF' },
     { path: '/compress', title: 'Compress PDF' },
     { path: '/pdf-to-image', title: 'PDF to Image' },
-    { path: '/image-to-pdf', title: 'Image to PDF' },
+    { path: '/image-to-pdf', title: 'Images to PDF' },
     { path: '/rotate', title: 'Rotate PDF' },
     { path: '/organize', title: 'Organize Pages' },
     { path: '/watermark', title: 'Add Watermark' },
@@ -49,9 +49,9 @@ test.describe('Navigation and Routing', () => {
     await page.setViewportSize({ width: 375, height: 667 }); // iPhone SE size
     await page.goto('/');
     
-    await expect(page.getByRole('heading', { name: 'PDF Toolbox' })).toBeVisible();
-    
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
     // Check that tool cards are visible and properly laid out
-    await expect(page.getByRole('link', { name: /merge pdfs/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /merge pdfs/i }).first()).toBeVisible();
   });
 });

@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!--
+      Content-Security-Policy is injected into the BUILT index.html by vite.config.ts
+      (build only — a strict CSP would block Vite's dev-mode inline preamble) and is also
+      sent as a response header by netlify.toml / vercel.json / Dockerfile. There is
+      intentionally NO remote origin in connect-src, so data can never leave the browser.
+    -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Free PDF Tools Online - Merge, Split, Compress PDFs | PDF Toolbox</title>
     <meta name="description" content="Free online PDF tools for merging, splitting, compressing, converting, and editing PDFs. No uploads required - all processing happens securely in your browser. Try our PDF editor now!" />

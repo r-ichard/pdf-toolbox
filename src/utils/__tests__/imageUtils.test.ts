@@ -30,9 +30,11 @@ vi.mock('pdfjs-dist', () => ({
         getViewport: vi.fn().mockReturnValue({ width: 595, height: 842 }),
         render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
       }),
+      destroy: vi.fn(),
     }),
   }),
-  version: '3.0.0'
+  GlobalWorkerOptions: { workerSrc: '' },
+  version: '4.10.38'
 }))
 
 // Mock file-saver and jszip
@@ -49,23 +51,30 @@ vi.mock('jszip', () => {
   }
 })
 
+// Captured once so non-canvas elements still come from happy-dom (keeps window teardown happy).
+const baseCreateElement = global.document.createElement.bind(global.document)
+
 describe('imageUtils', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    
+
     // Mock canvas and context
     const mockContext = {
       drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: '',
     }
-    
+
     const mockCanvas = {
       getContext: vi.fn().mockReturnValue(mockContext),
       toBlob: vi.fn((callback) => callback(new Blob(['canvas'], { type: 'image/png' }))),
       width: 0,
       height: 0,
     }
-    
-    global.document.createElement = vi.fn().mockReturnValue(mockCanvas)
+
+    // Only intercept <canvas>; delegate everything else to the real document.
+    global.document.createElement = vi.fn((tag: string) =>
+      tag === 'canvas' ? mockCanvas : baseCreateElement(tag)) as any
   })
 
   describe('convertImagesToPDF', () => {

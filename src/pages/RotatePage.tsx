@@ -3,6 +3,7 @@ import { PDFFile, ProcessingProgress } from '@/types';
 import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorBanner from '@/components/ErrorBanner';
 import { Download, Check, FileText, Rotate as RotateIcon } from '@/components/Icons';
 import { rotatePDF, downloadFile, getPageCount, generatePDFPreview } from '@/utils/pdfUtils';
 
@@ -28,6 +29,7 @@ export default function RotatePage() {
   const [progress, setProgress] = useState<ProcessingProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelected = useCallback(async (files: File[]) => {
     const selectedFile = files[0];
@@ -134,7 +136,8 @@ export default function RotatePage() {
     
     setIsProcessing(true);
     setIsComplete(false);
-    
+    setError(null);
+
     try {
       // Apply rotations one by one for each unique angle
       let currentPdfBytes = await file.file.arrayBuffer();
@@ -183,9 +186,9 @@ export default function RotatePage() {
       setIsComplete(true);
       
       setProgress({ current: 100, total: 100, message: 'Complete!' });
-    } catch (error) {
-      console.error('Rotation failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during rotation' });
+    } catch (err) {
+      console.error('Rotation failed:', err);
+      setError('We couldn\'t rotate this PDF. It may be corrupted or password-protected — try removing the password first.');
     } finally {
       setIsProcessing(false);
     }
@@ -224,6 +227,7 @@ export default function RotatePage() {
         </FileDropZone>
       ) : (
         <div className="space-y-6">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
           {/* File Info */}
           <div className="card">
             <div className="flex items-center space-x-4">

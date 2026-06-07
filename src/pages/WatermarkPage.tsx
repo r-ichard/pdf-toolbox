@@ -3,6 +3,7 @@ import { PDFFile, ProcessingProgress } from '@/types';
 import FileDropZone from '@/components/FileDropZone';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorBanner from '@/components/ErrorBanner';
 import { Download, Check, FileText, Upload } from '@/components/Icons';
 import { addWatermarkToPDF, downloadFile, getPageCount, generatePDFPreview } from '@/utils/pdfUtils';
 
@@ -40,6 +41,7 @@ export default function WatermarkPage() {
   const [progress, setProgress] = useState<ProcessingProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelected = useCallback(async (files: File[]) => {
     const selectedFile = files[0];
@@ -146,7 +148,8 @@ export default function WatermarkPage() {
     
     setIsProcessing(true);
     setIsComplete(false);
-    
+    setError(null);
+
     try {
       const position = selectedPosition.id === 'custom' ? customPosition : selectedPosition;
       
@@ -165,9 +168,9 @@ export default function WatermarkPage() {
       const fileName = file.name.replace('.pdf', '_watermarked.pdf');
       downloadFile(watermarkedPdf, fileName);
       setIsComplete(true);
-    } catch (error) {
-      console.error('Watermarking failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during watermarking' });
+    } catch (err) {
+      console.error('Watermarking failed:', err);
+      setError(err instanceof Error ? err.message : 'We couldn\'t add the watermark. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -205,6 +208,7 @@ export default function WatermarkPage() {
         </FileDropZone>
       ) : (
         <div className="space-y-6">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
           {/* File Info */}
           <div className="card">
             <div className="flex items-center space-x-4">

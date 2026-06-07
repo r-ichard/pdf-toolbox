@@ -10,6 +10,7 @@ export default function PasswordRemovePage() {
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [password, setPassword] = useState('');
 
   const handleFileSelect = async (files: File[]) => {
@@ -40,6 +41,7 @@ export default function PasswordRemovePage() {
     try {
       setProcessing(true);
       setError(null);
+      setSuccess(false);
       setProgress(0);
 
       const result = await removePasswordFromPDF(file, {
@@ -63,6 +65,7 @@ export default function PasswordRemovePage() {
 
       setProgress(100);
       setProgressMessage('Complete!');
+      setSuccess(true);
     } catch (error) {
       console.error('Error removing password protection:', error);
       setError(error instanceof Error ? error.message : 'Failed to remove password protection');
@@ -77,6 +80,7 @@ export default function PasswordRemovePage() {
     setProgress(0);
     setProgressMessage('');
     setError(null);
+    setSuccess(false);
     setPassword('');
   };
 
@@ -175,6 +179,16 @@ export default function PasswordRemovePage() {
               progress={progress} 
               message={progressMessage}
             />
+          )}
+
+          {/* Success */}
+          {success && !error && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <h3 className="text-sm font-medium text-green-900">Password removed successfully!</h3>
+              <p className="text-sm text-green-700 mt-1">
+                Your unlocked PDF has been downloaded. It now opens without a password.
+              </p>
+            </div>
           )}
 
           {/* Error */}

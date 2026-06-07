@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { PDFFile, ProcessingProgress } from '@/types';
-import FileDropZone from '@/components/FileDropZone';
+import FileDropZone, { FileDropZoneHandle } from '@/components/FileDropZone';
 import FilePreview from '@/components/FilePreview';
 import ProgressBar from '@/components/ProgressBar';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -21,6 +21,7 @@ export default function MergePage() {
     author: '',
     subject: ''
   });
+  const addMoreRef = useRef<FileDropZoneHandle>(null);
 
   const handleFilesSelected = useCallback(async (selectedFiles: File[]) => {
     try {
@@ -29,7 +30,7 @@ export default function MergePage() {
       
       // Validate files
       const validation = validateFiles(selectedFiles, {
-        maxFiles: 20,
+        maxFiles: 10,
         maxSizeBytes: 100 * 1024 * 1024, // 100MB per file
         requirePDF: true,
         allowedTypes: ['application/pdf'],
@@ -129,8 +130,12 @@ export default function MergePage() {
       downloadFile(mergedPdf, fileName);
       setIsComplete(true);
     } catch (error) {
-      console.error('Merge failed:', error);
-      setProgress({ current: 0, total: 100, message: 'Error occurred during merge' });
+      const processed = handleError(error, { operation: 'merge' });
+      console.error('Merge failed:', processed);
+      setError(
+        displayUserFriendlyError(processed) +
+          ' One of the files may be corrupted or password-protected — remove it (or its password) and try again.'
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -309,7 +314,7 @@ export default function MergePage() {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <button
-              onClick={() => document.getElementById('file-input')?.click()}
+              onClick={() => addMoreRef.current?.open()}
               className="btn-secondary flex-1"
               disabled={isProcessing}
             >
@@ -327,6 +332,7 @@ export default function MergePage() {
 
           <div className="hidden">
             <FileDropZone
+              ref={addMoreRef}
               onFilesSelected={handleFilesSelected}
               acceptedTypes={['.pdf', 'application/pdf']}
               maxFiles={10}
