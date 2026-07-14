@@ -8,7 +8,6 @@ pnpm-debug.log*
 # Production build
 dist/
 build/
-.vercel/
 .netlify/
 
 # Environment variables

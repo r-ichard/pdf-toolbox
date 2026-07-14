@@ -271,20 +271,6 @@ This application supports multiple deployment methods for different environments
    # Upload dist/ folder to Netlify
    ```
 
-#### Vercel (Static Hosting)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
-
-1. **Automatic Deployment**:
-   - Import your repository in Vercel dashboard
-   - Configuration automatically detected via `vercel.json`
-   - Zero-config deployment with preview environments
-
-2. **CLI Deployment**:
-   ```bash
-   npm i -g vercel
-   vercel --prod
-   ```
-
 ### Self-Hosted Deployment
 
 #### Docker (Production Ready)
