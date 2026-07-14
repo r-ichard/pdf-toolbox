@@ -40,7 +40,7 @@ A comprehensive, privacy-focused PDF toolbox with 10+ powerful tools that runs e
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 22+ 
 - npm or yarn
 
 ### Installation
@@ -369,7 +369,7 @@ npm run preview
 #### Production Requirements
 
 **System Requirements:**
-- Node.js 18+ (for building)
+- Node.js 22+ (for building)
 - Modern web server (Nginx, Apache, or CDN)
 - HTTPS certificate (recommended)
 
@@ -401,7 +401,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
       - run: npm ci
       - run: npm run test:ci
